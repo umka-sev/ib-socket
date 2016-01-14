@@ -1,5 +1,5 @@
 Bottom: 199c14b7301f83f79b686d1d464572735fbe2db9
-Top:    997bf463afe4a636d1d3adf56374bdd0b13692d8
+Top:    8a283712a33d06509defa1d2a4fff8edd402f8bc
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-14 11:49:20 +0300
 
@@ -11,8 +11,20 @@ wait until address + route will resolved.
 
 ---
 
+diff --git a/Makefile b/Makefile
+index 21ac7e7..590400a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,6 +1,6 @@
+ ifneq ($(KERNELRELEASE),)
+     obj-m	:= netsrv.o netcli.o
+-    obj_ib-y	:= ib-sock.o 
++    obj_ib-y	:= ib-sock.o ib-sock-util.o
+     netsrv-objs	:= srv.o $(obj_ib-y)
+     netcli-objs	:= cli.o $(obj_ib-y)
+ else
 diff --git a/cli.c b/cli.c
-index e4d0f59..8eb3a7b 100644
+index e4d0f59..b6deb50 100644
 --- a/cli.c
 +++ b/cli.c
 @@ -1,7 +1,9 @@
@@ -27,12 +39,13 @@ index e4d0f59..8eb3a7b 100644
  static __u32 addr  = 0;
  
  
-@@ -9,11 +11,33 @@ static int __init
+@@ -9,11 +11,36 @@ static int __init
  cli_init(void)
  {
  	struct IB_SOCK *sock;
 +	unsigned a,b,c,d;
 +	struct sockaddr_in  dstaddr;
++	unsigned long event;
 +	int err;
 +
 +	/* numeric IP? */
@@ -55,13 +68,15 @@ index e4d0f59..8eb3a7b 100644
 +		printk("error connect \n");
 +		goto exit;
 +	}
-+	ssleep(10);
++	event = ib_socket_poll(sock);
++	printk("Event hit %lx\n", event);
++
 +	ib_socket_disconnect(sock);
 +exit:
  	ib_socket_destroy(sock);
  	return 0;
  }
-@@ -26,4 +50,4 @@ cli_cleanup(void)
+@@ -26,4 +53,4 @@ cli_cleanup(void)
  module_init(cli_init);
  module_exit(cli_cleanup);
  
@@ -69,10 +84,10 @@ index e4d0f59..8eb3a7b 100644
 \ No newline at end of file
 +MODULE_LICENSE("GPL");
 diff --git a/ib-sock-int.h b/ib-sock-int.h
-index e5f19fc..fc1fe25 100644
+index e5f19fc..176b0c9 100644
 --- a/ib-sock-int.h
 +++ b/ib-sock-int.h
-@@ -7,9 +7,32 @@
+@@ -7,9 +7,54 @@
  #include <rdma/ib_verbs.h>
  #include <rdma/rdma_cm.h>
  
@@ -81,10 +96,16 @@ index e5f19fc..fc1fe25 100644
 +#define IB_ADDR_TIMEOUT 100
 +#define IB_ROUTE_TIMEOUT 100
 +
++enum ib_sock_flags {
++	SOCK_CONNECTED	= 1 << 0,
++	SOCK_ERROR	= 1 << 1,
++};
++
  struct IB_SOCK {
  	/* primary OFED stack ID */
  	struct rdma_cm_id	*is_id;
 +
++	unsigned long		is_flags;
 +	/* transfer related parts */
 +	/* completion events */
 +	struct ib_cq		*is_cq;
@@ -93,8 +114,17 @@ index e5f19fc..fc1fe25 100644
 +
 +	/* event mask */
 +	unsigned long		is_events;
++	wait_queue_head_t	is_events_wait;
  };
  
++static inline
++void sock_event_set(struct IB_SOCK *sock, unsigned int event)
++{
++	sock->is_events |= event;
++	wake_up(&sock->is_events_wait);
++}
++
++
 +/* messages on wire */
 +#define WIRE_ATTR	__attribute__((packed))
 +
@@ -104,12 +134,19 @@ index e5f19fc..fc1fe25 100644
 +	__u32	magic;
 +} WIRE_ATTR;
 +
++
++
++/* util.c */
++const char *ib_event_type_str(enum ib_event_type ev_type);
++const char *wr_status_str(enum ib_wc_status status);
++char *cm_event_type_str(enum rdma_cm_event_type ev_type);
++
  #endif
 diff --git a/ib-sock.c b/ib-sock.c
-index 1c67337..6b0ab20 100644
+index 1c67337..24ebe3b 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
-@@ -1,6 +1,74 @@
+@@ -1,12 +1,82 @@
  #include "ib-sock.h"
  #include "ib-sock-int.h"
  
@@ -168,7 +205,7 @@ index 1c67337..6b0ab20 100644
 +			ret = -EPROTO;
 +			break;
 +		}
-+
++		sock_event_set(sock, POLLOUT);
 +		break;
 +	}
 +	default:
@@ -183,8 +220,18 @@ index 1c67337..6b0ab20 100644
 +
  static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  {
++	struct IB_SOCK *sock = cmid->context;
  	int ret = 0;
-@@ -14,6 +82,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 
+-	printk("CM event %d status %d conn %p id %p\n",
+-		event->event, event->status, cmid->context, cmid);
++	printk("CM event %s status %d conn %p id %p\n",
++		cm_event_type_str(event->event), event->status, cmid->context,
++		cmid);
+ 
+ 	switch (event->event) {
+ 	/* client related events */
+@@ -14,6 +84,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  	case RDMA_CM_EVENT_ROUTE_RESOLVED:
  	case RDMA_CM_EVENT_ESTABLISHED:
  	case RDMA_CM_EVENT_CONNECT_RESPONSE:
@@ -192,7 +239,27 @@ index 1c67337..6b0ab20 100644
  		break;
  	/* server related events */
  	case RDMA_CM_EVENT_CONNECT_REQUEST:
-@@ -67,3 +136,48 @@ void ib_socket_destroy(struct IB_SOCK *sock)
+@@ -24,6 +95,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 	case RDMA_CM_EVENT_CONNECT_ERROR:
+ 	case RDMA_CM_EVENT_UNREACHABLE:
+ 	case RDMA_CM_EVENT_REJECTED:
++		sock->is_flags |= SOCK_ERROR;
+ 		break;
+ 	/* some hard errors to abort connection */
+ 	case RDMA_CM_EVENT_DISCONNECTED:
+@@ -34,6 +106,11 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 		printk("Unexpected RDMA CM event (%d)\n", event->event);
+ 		break;
+ 	}
++
++	if (ret < 0) {
++		sock->is_flags |= SOCK_ERROR;
++		sock_event_set(sock, POLLERR);
++	}
+ 	return ret;
+ }
+ 
+@@ -67,3 +144,71 @@ void ib_socket_destroy(struct IB_SOCK *sock)
  		rdma_destroy_id(sock->is_id);
  	kfree(sock);
  }
@@ -234,15 +301,38 @@ index 1c67337..6b0ab20 100644
 +	 */
 +
 +	if ((sock->is_flags & SOCK_CONNECTED) == 0)
-+		return 0;
++		return;
 +
 +	err = rdma_disconnect(sock->is_id);
 +	if (err)
 +		printk("Failed to disconnect, conn: 0x%p err %d\n",
 +			 sock,err);
 +}
++
++static unsigned long __take_event(struct IB_SOCK *sock, unsigned long *e)
++{
++	unsigned long events;
++	
++	events = xchg(&sock->is_events, 0);
++	if (events != 0)
++		*e = events;
++
++	return events;
++}
++
++unsigned long ib_socket_poll(struct IB_SOCK *sock)
++{
++	unsigned long mask = 0;
++
++	wait_event(sock->is_events_wait, __take_event(sock, &mask));
++
++	if (sock->is_flags & SOCK_ERROR)
++		mask |= POLLERR;
++
++	return mask;
++}
 diff --git a/ib-sock.h b/ib-sock.h
-index 96d019b..103534d 100644
+index 96d019b..533e991 100644
 --- a/ib-sock.h
 +++ b/ib-sock.h
 @@ -11,9 +11,18 @@
@@ -261,7 +351,7 @@ index 96d019b..103534d 100644
 +void ib_socket_disconnect(struct IB_SOCK *sock);
 +
 +/* sleep to wait poll event from socket */
-+unsigned long ib_socket_pool(struct IB_SOCK *sock);
++unsigned long ib_socket_poll(struct IB_SOCK *sock);
 +
  #endif
 \ No newline at end of file
