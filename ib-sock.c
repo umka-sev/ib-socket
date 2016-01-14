@@ -11,10 +11,54 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 	case RDMA_CM_EVENT_ADDR_RESOLVED:
 		ret = rdma_resolve_route(cmid, IB_ROUTE_TIMEOUT);
 		break;
-	case RDMA_CM_EVENT_ROUTE_RESOLVED:
+	case RDMA_CM_EVENT_ROUTE_RESOLVED: {
+		/* route resolved - need to send an HELLO message */
+		struct rdma_conn_param	conn_param;
+		struct ib_hello	hello;
+
+		memset(&conn_param, 0, sizeof conn_param);
+		conn_param.responder_resources = 4;
+		conn_param.initiator_depth     = 1;
+		conn_param.retry_count	       = 7;
+		conn_param.rnr_retry_count     = 6;
+
+		/* fill a hello message */
+		hello.magic = IB_HELLO_MAGIC;
+		conn_param.private_data		= (void *)&hello;
+		conn_param.private_data_len	= sizeof(struct ib_hello);
+
+		/* we may use a strict IB verbs API to send a hello message
+		 * instead of rdma_ API */
+		ret = rdma_connect(sock->is_id, &conn_param);
+		if (ret)
+			printk("failure connecting: %d\n", ret);
+		else
+			sock->is_flags |= SOCK_CONNECTED;
+
 		break;
+	}
+#if 0
 	case RDMA_CM_EVENT_ESTABLISHED:
 		break;
+#endif
+	case RDMA_CM_EVENT_CONNECT_RESPONSE: {
+		/* This event Generated  on  the active side to notify the user of a
+		 * successful response to a connection  request.   It  is
+		 * only  generated  on rdma_cm_id's that do not have a QP
+		 * associated with them.
+		*/
+		/* we delay to create a connection resources until we have
+		 * check a server connect response, it save lots resources
+		 * in case server have a wrong version or capabilites */
+		const struct ib_hello *hello = event->param.conn.private_data;
+
+		if (hello->magic != IB_HELLO_MAGIC) {
+			ret = -EPROTO;
+			break;
+		}
+
+		break;
+	}
 	default:
 		ret = -EINVAL;
 		break;
@@ -94,7 +138,7 @@ void ib_socket_destroy(struct IB_SOCK *sock)
 }
 
 /***************************************************************************************/
-/* 
+/*
  * In IB terms - connect is resolving address + router + some connect mgs exchange.
  * all of it done via CM related events.
  *
@@ -110,8 +154,8 @@ int ib_socket_connect(struct IB_SOCK *sock, struct sockaddr_in  *dstaddr)
         srcaddr.sin_family      = AF_INET;
 
 	/* IB needs to start from resolve addr / route first */
-	err = rdma_resolve_addr(sock->is_id, (struct sockaddr *)&srcaddr, 
-			        (struct sockaddr *)dstaddr, 
+	err = rdma_resolve_addr(sock->is_id, (struct sockaddr *)&srcaddr,
+			        (struct sockaddr *)dstaddr,
 			        IB_ADDR_TIMEOUT /* timeout ms */
 			        );
 	printk("resolve dst address status %d\n", err);
@@ -128,6 +172,9 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
 	 * rdma_disconnect since this is the only way to cause the CM to change
 	 * the QP state to ERROR
 	 */
+
+	if ((sock->is_flags & SOCK_CONNECTED) == 0)
+		return 0;
 
 	err = rdma_disconnect(sock->is_id);
 	if (err)

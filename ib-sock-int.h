@@ -29,6 +29,8 @@ struct IB_SOCK {
 /* messages on wire */
 #define WIRE_ATTR	__attribute__((packed))
 
+#define IB_HELLO_MAGIC 0x9012
+
 struct ib_hello {
 	__u32	magic;
 } WIRE_ATTR;
