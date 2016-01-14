@@ -1,0 +1,11 @@
+Bottom: e872032d0f69c10496ca086868f7d645f6133b84
+Top:    e872032d0f69c10496ca086868f7d645f6133b84
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-14 11:20:44 +0300
+
+introduce a IB socket structure with minimal code.
+
+
+---
+
+
