@@ -1,8 +1,8 @@
 Version: 1
-Previous: 913a5b2a93adaa86318f32c1950b28ae36a0a64e
+Previous: 7197e0a05fb5f00e2bf8b245373cd9fd6ae956dd
 Head: e61cdd1d6e8f672bbbbc314006417e66148f52b1
 Applied:
   ib-sock-into.patch: c21ffebdf559a968b576abe5b2fa07716e4ff72d
-  cli-srv.patch: e61cdd1d6e8f672bbbbc314006417e66148f52b1
+  cli.patch: e61cdd1d6e8f672bbbbc314006417e66148f52b1
 Unapplied:
 Hidden:
