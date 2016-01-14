@@ -1,0 +1,14 @@
+Bottom: 199c14b7301f83f79b686d1d464572735fbe2db9
+Top:    199c14b7301f83f79b686d1d464572735fbe2db9
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-14 11:49:20 +0300
+
+connect ib socket to the destination.
+It's not easy as traditional socket API,
+we need to create resourses ourself and
+wait until address + route will resolved.
+
+
+---
+
+
