@@ -1,5 +1,5 @@
 Bottom: 199c14b7301f83f79b686d1d464572735fbe2db9
-Top:    199c14b7301f83f79b686d1d464572735fbe2db9
+Top:    762a71695614fb1f530688bdb8426c4ed7cb01f2
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-14 11:49:20 +0300
 
@@ -11,4 +11,208 @@ wait until address + route will resolved.
 
 ---
 
-
+diff --git a/cli.c b/cli.c
+index e4d0f59..49bded4 100644
+--- a/cli.c
++++ b/cli.c
+@@ -1,7 +1,9 @@
+ #include "ib-sock.h"
+ 
+-static unsigned int port = 10000;
+-const char *srv_addr = "192.168.1.1";
++#include <linux/delay.h>
++
++static unsigned int port = 998;
++const char *srv_addr = "172.18.56.132";
+ static __u32 addr  = 0;
+ 
+ 
+@@ -9,11 +11,33 @@ static int __init
+ cli_init(void)
+ {
+ 	struct IB_SOCK *sock;
++	unsigned a,b,c,d;
++	struct sockaddr_in  dstaddr;
++	int err;
++
++	/* numeric IP? */
++	if (sscanf(srv_addr, "%u.%u.%u.%u", &a, &b, &c, &d)) {
++		addr = ((a<<24)|(b<<16)|(c<<8)|d);
++		return 1;
++	}
+ 
+ 	sock = ib_socket_create();
+ 	if (sock == NULL)
+ 		return -ENOMEM;
+ 
++	memset(&dstaddr, 0, sizeof(dstaddr));
++	dstaddr.sin_family = AF_INET;
++	dstaddr.sin_addr.s_addr = (__force u32)addr;
++	dstaddr.sin_port = htons(port);
++
++	err = ib_socket_connect(sock, &dstaddr);
++	if (err) {
++		printk("error connect \n");
++		goto exit;
++	}
++	ssleep(10);
++	ib_socket_disconnect(sock);
++exit:
+ 	ib_socket_destroy(sock);
+ 	return 0;
+ }
+@@ -26,4 +50,4 @@ cli_cleanup(void)
+ module_init(cli_init);
+ module_exit(cli_cleanup);
+ 
+-MODULE_LICENSE("GPL");
+\ No newline at end of file
++MODULE_LICENSE("GPL");
+diff --git a/ib-sock-int.h b/ib-sock-int.h
+index e5f19fc..c11bf41 100644
+--- a/ib-sock-int.h
++++ b/ib-sock-int.h
+@@ -7,9 +7,30 @@
+ #include <rdma/ib_verbs.h>
+ #include <rdma/rdma_cm.h>
+ 
++#define IB_CQ_EVENTS_MAX 128
++
++#define IB_ADDR_TIMEOUT 100
++#define IB_ROUTE_TIMEOUT 100
++
+ struct IB_SOCK {
+ 	/* primary OFED stack ID */
+ 	struct rdma_cm_id	*is_id;
++
++	/* transfer related parts */
++	/* completion events */
++	struct ib_cq		*is_cq;
++	/* queue pair to communicate between nodes */
++	struct ib_qp		*is_qp;
++
++	/* event mask */
++	unsigned long		is_events;
+ };
+ 
++/* messages on wire */
++#define WIRE_ATTR	__attribute__((packed))
++
++struct ib_hello {
++	__u32	magic;
++} WIRE_ATTR;
++
+ #endif
+diff --git a/ib-sock.c b/ib-sock.c
+index 1c67337..90c6bcd 100644
+--- a/ib-sock.c
++++ b/ib-sock.c
+@@ -1,6 +1,30 @@
+ #include "ib-sock.h"
+ #include "ib-sock-int.h"
+ 
++static int
++cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
++{
++	struct IB_SOCK *sock = cmid->context;
++	int ret = 0;
++
++	switch (event->event) {
++	case RDMA_CM_EVENT_ADDR_RESOLVED:
++		ret = rdma_resolve_route(cmid, IB_ROUTE_TIMEOUT);
++		break;
++	case RDMA_CM_EVENT_ROUTE_RESOLVED:
++		break;
++	case RDMA_CM_EVENT_ESTABLISHED:
++		break;
++	default:
++		ret = -EINVAL;
++		break;
++	}
++
++	printk("client CM event ret %d\n", ret);
++	return ret;
++}
++
++
+ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ {
+ 	int ret = 0;
+@@ -14,6 +38,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 	case RDMA_CM_EVENT_ROUTE_RESOLVED:
+ 	case RDMA_CM_EVENT_ESTABLISHED:
+ 	case RDMA_CM_EVENT_CONNECT_RESPONSE:
++		ret = cm_client_handler(cmid, event);
+ 		break;
+ 	/* server related events */
+ 	case RDMA_CM_EVENT_CONNECT_REQUEST:
+@@ -67,3 +92,45 @@ void ib_socket_destroy(struct IB_SOCK *sock)
+ 		rdma_destroy_id(sock->is_id);
+ 	kfree(sock);
+ }
++
++/***************************************************************************************/
++/* 
++ * In IB terms - connect is resolving address + router + some connect mgs exchange.
++ * all of it done via CM related events.
++ *
++ * IB uses an IP addresses as some ID to resolve in destination GID value.
++ */
++
++int ib_socket_connect(struct IB_SOCK *sock, struct sockaddr_in  *dstaddr)
++{
++	struct sockaddr_in  srcaddr;
++	int err;
++
++        memset(&srcaddr, 0, sizeof(srcaddr));
++        srcaddr.sin_family      = AF_INET;
++
++	/* IB needs to start from resolve addr / route first */
++	err = rdma_resolve_addr(sock->is_id, (struct sockaddr *)&srcaddr, 
++			        (struct sockaddr *)dstaddr, 
++			        IB_ADDR_TIMEOUT /* timeout ms */
++			        );
++	printk("resolve dst address status %d\n", err);
++
++	/* when connect will done - WRITE event will generated */
++	return err;
++}
++
++void ib_socket_disconnect(struct IB_SOCK *sock)
++{
++	int err = 0;
++
++	/* change the ib conn state only if the conn is UP, however always call
++	 * rdma_disconnect since this is the only way to cause the CM to change
++	 * the QP state to ERROR
++	 */
++
++	err = rdma_disconnect(sock->is_id);
++	if (err)
++		printk("Failed to disconnect, conn: 0x%p err %d\n",
++			 sock,err);
++}
+diff --git a/ib-sock.h b/ib-sock.h
+index 96d019b..103534d 100644
+--- a/ib-sock.h
++++ b/ib-sock.h
+@@ -11,9 +11,18 @@
+ #include <linux/socket.h>
+ #include <linux/in.h>
+ 
++#include <linux/poll.h>
++
+ struct IB_SOCK;
+ 
+ struct IB_SOCK *ib_socket_create(void);
+ void ib_socket_destroy(struct IB_SOCK *sock);
+ 
++/* async. return POLLOUT or POLLERR events */
++int ib_socket_connect(struct IB_SOCK *sock, struct sockaddr_in  *dstaddr);
++void ib_socket_disconnect(struct IB_SOCK *sock);
++
++/* sleep to wait poll event from socket */
++unsigned long ib_socket_pool(struct IB_SOCK *sock);
++
+ #endif
+\ No newline at end of file
