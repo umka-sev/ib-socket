@@ -1,5 +1,5 @@
 Bottom: e872032d0f69c10496ca086868f7d645f6133b84
-Top:    9a22d550b1e7bbfe96fabd7ccd43da692d6776e4
+Top:    294ad5db1a94b17e67167884f4010c642055c7b1
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-14 11:20:44 +0300
 
@@ -90,10 +90,10 @@ index 0000000..e5f19fc
 +#endif
 diff --git a/ib-sock.c b/ib-sock.c
 new file mode 100644
-index 0000000..97fb5c6
+index 0000000..8870570
 --- /dev/null
 +++ b/ib-sock.c
-@@ -0,0 +1,65 @@
+@@ -0,0 +1,67 @@
 +#include "ib-sock.h"
 +#include "ib-sock-int.h"
 +
@@ -105,11 +105,13 @@ index 0000000..97fb5c6
 +		event->event, event->status, cmid->context, cmid);
 +
 +	switch (event->event) {
++	/* client related events */
 +	case RDMA_CM_EVENT_ADDR_RESOLVED:
 +	case RDMA_CM_EVENT_ROUTE_RESOLVED:
 +	case RDMA_CM_EVENT_ESTABLISHED:
 +	case RDMA_CM_EVENT_CONNECT_RESPONSE:
 +		break;
++	/* server related events */
 +	case RDMA_CM_EVENT_CONNECT_REQUEST:
 +		break;
 +	/* some common errors */
