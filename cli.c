@@ -1,7 +1,9 @@
 #include "ib-sock.h"
 
-static unsigned int port = 10000;
-const char *srv_addr = "192.168.1.1";
+#include <linux/delay.h>
+
+static unsigned int port = 998;
+const char *srv_addr = "172.18.56.132";
 static __u32 addr  = 0;
 
 
@@ -9,11 +11,36 @@ static int __init
 cli_init(void)
 {
 	struct IB_SOCK *sock;
+	unsigned a,b,c,d;
+	struct sockaddr_in  dstaddr;
+	unsigned long event;
+	int err;
+
+	/* numeric IP? */
+	if (sscanf(srv_addr, "%u.%u.%u.%u", &a, &b, &c, &d) != 4)
+		return -EINVAL;
+
+	addr = ((a<<24)|(b<<16)|(c<<8)|d);
 
 	sock = ib_socket_create();
 	if (sock == NULL)
 		return -ENOMEM;
 
+	memset(&dstaddr, 0, sizeof(dstaddr));
+	dstaddr.sin_family = AF_INET;
+	dstaddr.sin_addr.s_addr = htonl(addr);
+	dstaddr.sin_port = htons(port);
+
+	err = ib_socket_connect(sock, &dstaddr);
+	if (err) {
+		printk("error connect \n");
+		goto exit;
+	}
+	event = ib_socket_poll(sock);
+	printk("Event hit %lx\n", event);
+
+	ib_socket_disconnect(sock);
+exit:
 	ib_socket_destroy(sock);
 	return 0;
 }
