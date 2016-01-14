@@ -23,6 +23,6 @@ int ib_socket_connect(struct IB_SOCK *sock, struct sockaddr_in  *dstaddr);
 void ib_socket_disconnect(struct IB_SOCK *sock);
 
 /* sleep to wait poll event from socket */
-unsigned long ib_socket_pool(struct IB_SOCK *sock);
+unsigned long ib_socket_poll(struct IB_SOCK *sock);
 
 #endif

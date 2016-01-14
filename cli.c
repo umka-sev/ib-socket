@@ -13,6 +13,7 @@ cli_init(void)
 	struct IB_SOCK *sock;
 	unsigned a,b,c,d;
 	struct sockaddr_in  dstaddr;
+	unsigned long event;
 	int err;
 
 	/* numeric IP? */
@@ -35,7 +36,9 @@ cli_init(void)
 		printk("error connect \n");
 		goto exit;
 	}
-	ssleep(10);
+	event = ib_socket_poll(sock);
+	printk("Event hit %lx\n", event);
+
 	ib_socket_disconnect(sock);
 exit:
 	ib_socket_destroy(sock);

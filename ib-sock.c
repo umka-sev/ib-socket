@@ -56,7 +56,7 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 			ret = -EPROTO;
 			break;
 		}
-
+		sock_event_set(sock, POLLOUT);
 		break;
 	}
 	default:
@@ -71,10 +71,12 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 
 static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 {
+	struct IB_SOCK *sock = cmid->context;
 	int ret = 0;
 
-	printk("CM event %d status %d conn %p id %p\n",
-		event->event, event->status, cmid->context, cmid);
+	printk("CM event %s status %d conn %p id %p\n",
+		cm_event_type_str(event->event), event->status, cmid->context,
+		cmid);
 
 	switch (event->event) {
 	/* client related events */
@@ -93,6 +95,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 	case RDMA_CM_EVENT_CONNECT_ERROR:
 	case RDMA_CM_EVENT_UNREACHABLE:
 	case RDMA_CM_EVENT_REJECTED:
+		sock->is_flags |= SOCK_ERROR;
 		break;
 	/* some hard errors to abort connection */
 	case RDMA_CM_EVENT_DISCONNECTED:
@@ -102,6 +105,11 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 	default:
 		printk("Unexpected RDMA CM event (%d)\n", event->event);
 		break;
+	}
+
+	if (ret < 0) {
+		sock->is_flags |= SOCK_ERROR;
+		sock_event_set(sock, POLLERR);
 	}
 	return ret;
 }
@@ -174,10 +182,33 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
 	 */
 
 	if ((sock->is_flags & SOCK_CONNECTED) == 0)
-		return 0;
+		return;
 
 	err = rdma_disconnect(sock->is_id);
 	if (err)
 		printk("Failed to disconnect, conn: 0x%p err %d\n",
 			 sock,err);
+}
+
+static unsigned long __take_event(struct IB_SOCK *sock, unsigned long *e)
+{
+	unsigned long events;
+	
+	events = xchg(&sock->is_events, 0);
+	if (events != 0)
+		*e = events;
+
+	return events;
+}
+
+unsigned long ib_socket_poll(struct IB_SOCK *sock)
+{
+	unsigned long mask = 0;
+
+	wait_event(sock->is_events_wait, __take_event(sock, &mask));
+
+	if (sock->is_flags & SOCK_ERROR)
+		mask |= POLLERR;
+
+	return mask;
 }
