@@ -1,5 +1,5 @@
 Bottom: 199c14b7301f83f79b686d1d464572735fbe2db9
-Top:    762a71695614fb1f530688bdb8426c4ed7cb01f2
+Top:    b0312d772e121a8ea7ccc49ca88f8915bbba4469
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-14 11:49:20 +0300
 
@@ -12,7 +12,7 @@ wait until address + route will resolved.
 ---
 
 diff --git a/cli.c b/cli.c
-index e4d0f59..49bded4 100644
+index e4d0f59..8eb3a7b 100644
 --- a/cli.c
 +++ b/cli.c
 @@ -1,7 +1,9 @@
@@ -36,10 +36,10 @@ index e4d0f59..49bded4 100644
 +	int err;
 +
 +	/* numeric IP? */
-+	if (sscanf(srv_addr, "%u.%u.%u.%u", &a, &b, &c, &d)) {
-+		addr = ((a<<24)|(b<<16)|(c<<8)|d);
-+		return 1;
-+	}
++	if (sscanf(srv_addr, "%u.%u.%u.%u", &a, &b, &c, &d) != 4)
++		return -EINVAL;
++
++	addr = ((a<<24)|(b<<16)|(c<<8)|d);
  
  	sock = ib_socket_create();
  	if (sock == NULL)
@@ -47,7 +47,7 @@ index e4d0f59..49bded4 100644
  
 +	memset(&dstaddr, 0, sizeof(dstaddr));
 +	dstaddr.sin_family = AF_INET;
-+	dstaddr.sin_addr.s_addr = (__force u32)addr;
++	dstaddr.sin_addr.s_addr = htonl(addr);
 +	dstaddr.sin_port = htons(port);
 +
 +	err = ib_socket_connect(sock, &dstaddr);
