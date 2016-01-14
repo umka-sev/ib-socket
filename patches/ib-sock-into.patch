@@ -1,5 +1,5 @@
 Bottom: e872032d0f69c10496ca086868f7d645f6133b84
-Top:    e872032d0f69c10496ca086868f7d645f6133b84
+Top:    9a22d550b1e7bbfe96fabd7ccd43da692d6776e4
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-14 11:20:44 +0300
 
@@ -8,4 +8,211 @@ introduce a IB socket structure with minimal code.
 
 ---
 
-
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..21ac7e7
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,17 @@
++ifneq ($(KERNELRELEASE),)
++    obj-m	:= netsrv.o netcli.o
++    obj_ib-y	:= ib-sock.o 
++    netsrv-objs	:= srv.o $(obj_ib-y)
++    netcli-objs	:= cli.o $(obj_ib-y)
++else
++    KDIR        := /lib/modules/$(shell uname -r)/build
++    PWD         := $(shell pwd)
++
++default:
++	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
++endif
++
++clean:
++	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) clean
++	rm -f Module.markers Module.symvers modules.order
++
+diff --git a/cli.c b/cli.c
+new file mode 100644
+index 0000000..e4d0f59
+--- /dev/null
++++ b/cli.c
+@@ -0,0 +1,29 @@
++#include "ib-sock.h"
++
++static unsigned int port = 10000;
++const char *srv_addr = "192.168.1.1";
++static __u32 addr  = 0;
++
++
++static int __init
++cli_init(void)
++{
++	struct IB_SOCK *sock;
++
++	sock = ib_socket_create();
++	if (sock == NULL)
++		return -ENOMEM;
++
++	ib_socket_destroy(sock);
++	return 0;
++}
++
++static void __exit
++cli_cleanup(void)
++{
++}
++
++module_init(cli_init);
++module_exit(cli_cleanup);
++
++MODULE_LICENSE("GPL");
+\ No newline at end of file
+diff --git a/ib-sock-int.h b/ib-sock-int.h
+new file mode 100644
+index 0000000..e5f19fc
+--- /dev/null
++++ b/ib-sock-int.h
+@@ -0,0 +1,15 @@
++#ifndef _IB_SOCK_INT_H_
++#define _IB_SOCK_INT_H_
++
++#include <linux/types.h>
++#include <linux/net.h>
++
++#include <rdma/ib_verbs.h>
++#include <rdma/rdma_cm.h>
++
++struct IB_SOCK {
++	/* primary OFED stack ID */
++	struct rdma_cm_id	*is_id;
++};
++
++#endif
+diff --git a/ib-sock.c b/ib-sock.c
+new file mode 100644
+index 0000000..97fb5c6
+--- /dev/null
++++ b/ib-sock.c
+@@ -0,0 +1,65 @@
++#include "ib-sock.h"
++#include "ib-sock-int.h"
++
++static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
++{
++	int ret = 0;
++
++	printk("CM event %d status %d conn %p id %p\n",
++		event->event, event->status, cmid->context, cmid);
++
++	switch (event->event) {
++	case RDMA_CM_EVENT_ADDR_RESOLVED:
++	case RDMA_CM_EVENT_ROUTE_RESOLVED:
++	case RDMA_CM_EVENT_ESTABLISHED:
++	case RDMA_CM_EVENT_CONNECT_RESPONSE:
++		break;
++	case RDMA_CM_EVENT_CONNECT_REQUEST:
++		break;
++	/* some common errors */
++	case RDMA_CM_EVENT_ADDR_ERROR:
++	case RDMA_CM_EVENT_ROUTE_ERROR:
++	case RDMA_CM_EVENT_CONNECT_ERROR:
++	case RDMA_CM_EVENT_UNREACHABLE:
++	case RDMA_CM_EVENT_REJECTED:
++		break;
++	/* some hard errors to abort connection */
++	case RDMA_CM_EVENT_DISCONNECTED:
++	case RDMA_CM_EVENT_DEVICE_REMOVAL:
++	case RDMA_CM_EVENT_ADDR_CHANGE:
++		break;
++	default:
++		printk("Unexpected RDMA CM event (%d)\n", event->event);
++		break;
++	}
++	return ret;
++}
++
++struct IB_SOCK *ib_socket_create()
++{
++	struct IB_SOCK *sock;
++
++	sock = kmalloc(sizeof(*sock), GFP_KERNEL);
++	if (sock == NULL)
++		return NULL;
++
++	sock->is_id = rdma_create_id(cm_handler, sock,
++					     RDMA_PS_TCP, IB_QPT_RC);
++	if (IS_ERR(sock->is_id)) {
++		printk("error create cm_id %ld\n", PTR_ERR(sock->is_id));
++		goto out_free;
++	}
++
++	return sock;
++out_free:
++	ib_socket_destroy(sock);
++	return NULL;
++}
++
++void ib_socket_destroy(struct IB_SOCK *sock)
++{
++
++	if (sock->is_id)
++		rdma_destroy_id(sock->is_id);
++	kfree(sock);
++}
+diff --git a/ib-sock.h b/ib-sock.h
+new file mode 100644
+index 0000000..96d019b
+--- /dev/null
++++ b/ib-sock.h
+@@ -0,0 +1,19 @@
++#ifndef _IB_SOCK_H_
++#define _IB_SOCK_H_
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include <linux/types.h>
++#include <linux/net.h>
++
++#include <linux/socket.h>
++#include <linux/in.h>
++
++struct IB_SOCK;
++
++struct IB_SOCK *ib_socket_create(void);
++void ib_socket_destroy(struct IB_SOCK *sock);
++
++#endif
+\ No newline at end of file
+diff --git a/srv.c b/srv.c
+new file mode 100644
+index 0000000..801b561
+--- /dev/null
++++ b/srv.c
+@@ -0,0 +1,24 @@
++#include "ib-sock.h"
++
++static int __init
++srv_init(void)
++{
++	struct IB_SOCK *sock;
++
++	sock = ib_socket_create();
++	if (sock == NULL)
++		return -ENOMEM;
++
++	ib_socket_destroy(sock);
++	return 0;
++}
++
++static void __exit
++srv_cleanup(void)
++{
++}
++
++module_init(srv_init);
++module_exit(srv_cleanup);
++
++MODULE_LICENSE("GPL");
+\ No newline at end of file
