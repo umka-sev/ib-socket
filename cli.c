@@ -16,10 +16,10 @@ cli_init(void)
 	int err;
 
 	/* numeric IP? */
-	if (sscanf(srv_addr, "%u.%u.%u.%u", &a, &b, &c, &d)) {
-		addr = ((a<<24)|(b<<16)|(c<<8)|d);
-		return 1;
-	}
+	if (sscanf(srv_addr, "%u.%u.%u.%u", &a, &b, &c, &d) != 4)
+		return -EINVAL;
+
+	addr = ((a<<24)|(b<<16)|(c<<8)|d);
 
 	sock = ib_socket_create();
 	if (sock == NULL)
@@ -27,7 +27,7 @@ cli_init(void)
 
 	memset(&dstaddr, 0, sizeof(dstaddr));
 	dstaddr.sin_family = AF_INET;
-	dstaddr.sin_addr.s_addr = (__force u32)addr;
+	dstaddr.sin_addr.s_addr = htonl(addr);
 	dstaddr.sin_port = htons(port);
 
 	err = ib_socket_connect(sock, &dstaddr);
