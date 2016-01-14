@@ -52,6 +52,7 @@ struct IB_SOCK *ib_socket_create()
 		goto out_free;
 	}
 
+	printk("IB socket create %p\n", sock);
 	return sock;
 out_free:
 	ib_socket_destroy(sock);
@@ -60,6 +61,7 @@ out_free:
 
 void ib_socket_destroy(struct IB_SOCK *sock)
 {
+	printk("IB socket destroy %p\n", sock);
 
 	if (sock->is_id)
 		rdma_destroy_id(sock->is_id);
