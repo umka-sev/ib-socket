@@ -1,5 +1,5 @@
 Bottom: e872032d0f69c10496ca086868f7d645f6133b84
-Top:    294ad5db1a94b17e67167884f4010c642055c7b1
+Top:    199c14b7301f83f79b686d1d464572735fbe2db9
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-14 11:20:44 +0300
 
@@ -90,10 +90,10 @@ index 0000000..e5f19fc
 +#endif
 diff --git a/ib-sock.c b/ib-sock.c
 new file mode 100644
-index 0000000..8870570
+index 0000000..1c67337
 --- /dev/null
 +++ b/ib-sock.c
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,69 @@
 +#include "ib-sock.h"
 +#include "ib-sock-int.h"
 +
@@ -148,6 +148,7 @@ index 0000000..8870570
 +		goto out_free;
 +	}
 +
++	printk("IB socket create %p\n", sock);
 +	return sock;
 +out_free:
 +	ib_socket_destroy(sock);
@@ -156,6 +157,7 @@ index 0000000..8870570
 +
 +void ib_socket_destroy(struct IB_SOCK *sock)
 +{
++	printk("IB socket destroy %p\n", sock);
 +
 +	if (sock->is_id)
 +		rdma_destroy_id(sock->is_id);
