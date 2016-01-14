@@ -9,11 +9,13 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 		event->event, event->status, cmid->context, cmid);
 
 	switch (event->event) {
+	/* client related events */
 	case RDMA_CM_EVENT_ADDR_RESOLVED:
 	case RDMA_CM_EVENT_ROUTE_RESOLVED:
 	case RDMA_CM_EVENT_ESTABLISHED:
 	case RDMA_CM_EVENT_CONNECT_RESPONSE:
 		break;
+	/* server related events */
 	case RDMA_CM_EVENT_CONNECT_REQUEST:
 		break;
 	/* some common errors */
