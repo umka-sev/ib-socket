@@ -10,6 +10,8 @@
 #define IB_ADDR_TIMEOUT 100
 #define IB_ROUTE_TIMEOUT 100
 
+#define IB_LISTEN_QUEUE 128
+
 enum ib_sock_flags {
 	SOCK_CONNECTED	= 1 << 0,
 	SOCK_ERROR	= 1 << 1,
@@ -20,6 +22,10 @@ struct IB_SOCK {
 	struct rdma_cm_id	*is_id;
 
 	unsigned long		is_flags;
+
+	/* pre-accepted sockets */
+	spinlock_t		is_child_lock;
+	struct list_head	is_child;
 
 	/* event mask */
 	unsigned long		is_events;
