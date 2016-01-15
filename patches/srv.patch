@@ -1,5 +1,5 @@
 Bottom: 4e8c93e7c7ca6ebbbc19ecf792e0fbbaf879f827
-Top:    7ad6247784d9ec21c15709b193b73283274224a9
+Top:    596c118522e14a7e8fa8e2d636285ac50ddb2319
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-15 12:45:24 +0300
 
@@ -49,11 +49,111 @@ index 84b91d6..a934272 100644
  	unsigned long		is_events;
  	wait_queue_head_t	is_events_wait;
 diff --git a/ib-sock.c b/ib-sock.c
-index fa47955..66acf02 100644
+index fa47955..6eab374 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
-@@ -138,6 +138,9 @@ struct IB_SOCK *ib_socket_create()
- 	}
+@@ -1,6 +1,9 @@
+ #include "ib-sock.h"
+ #include "ib-sock-int.h"
+ 
++struct IB_SOCK *__ib_socket_create(struct rdma_cm_id *cm_id);
++
++
+ static int
+ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ {
+@@ -68,6 +71,56 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 	return ret;
+ }
+ 
++static int
++cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
++{
++	int ret = 0;
++
++	switch (event->event) {
++	case RDMA_CM_EVENT_CONNECT_REQUEST: {
++		/* incomming request - lets allocate a resources for a new connect */
++		const struct ib_hello *hello = event->param.conn.private_data;
++		struct ib_hello hello_ack;
++		struct rdma_conn_param	conn_param;
++		struct IB_SOCK *sock;
++
++		if (hello->magic != IB_HELLO_MAGIC) {
++			printk("Incomming error: len %u magic %x\n",
++				event->param.conn.private_data_len,
++				hello->magic);
++			ret = -EPROTO;
++			break;
++		}
++
++		sock = __ib_socket_create(cmid);
++		if (ret != 0) {
++			printk("error accept \n");
++			ret = -ENOMEM;
++			break;
++		}
++
++		memset(&hello_ack, 0, sizeof hello_ack);
++
++		memset(&conn_param, 0, sizeof conn_param);
++		conn_param.private_data_len = sizeof hello_ack;
++		conn_param.private_data = &hello_ack;
++		conn_param.responder_resources = 0 /* no atomic */;
++		conn_param.initiator_depth = 0;
++		conn_param.retry_count = 10;
++
++		ret = rdma_accept(sock->is_id, &conn_param);
++		break;
++	}
++	default:
++		ret = -EINVAL;
++		break;
++	}
++
++	printk("server CM event ret %d\n", ret);
++
++	return ret;
++}
++
+ 
+ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ {
+@@ -88,6 +141,12 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 		break;
+ 	/* server related events */
+ 	case RDMA_CM_EVENT_CONNECT_REQUEST:
++		ret = cm_server_handler(cmid, event);
++		/* if we have any errors (including protocol violation 
++		 * during connect handshake, we need a destroy new allocated
++		 * cm_id  */
++		if (ret < 0)
++			return ret;
+ 		break;
+ 	/* some common errors */
+ 	case RDMA_CM_EVENT_ADDR_ERROR:
+@@ -121,7 +180,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 	return 0;
+ }
+ 
+-struct IB_SOCK *ib_socket_create()
++struct IB_SOCK *__ib_socket_create(struct rdma_cm_id *cm_id)
+ {
+ 	struct IB_SOCK *sock;
+ 
+@@ -129,23 +188,36 @@ struct IB_SOCK *ib_socket_create()
+ 	if (sock == NULL)
+ 		return NULL;
+ 
+-	sock->is_id = rdma_create_id(cm_handler, sock,
+-					     RDMA_PS_TCP, IB_QPT_RC);
+-	if (IS_ERR(sock->is_id)) {
+-		printk("error create cm_id %ld\n", PTR_ERR(sock->is_id));
+-		sock->is_id = NULL;
+-		goto out_free;
+-	}
++	sock->is_id = cm_id;
++	cm_id->context = sock;
  
  	sock->is_flags = 0;
 +
@@ -62,7 +162,33 @@ index fa47955..66acf02 100644
  	sock->is_events = 0;
  	init_waitqueue_head(&sock->is_events_wait);
  	
-@@ -201,7 +204,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
+ 	printk("IB socket create %p\n", sock);
+ 	return sock;
+-out_free:
+-	ib_socket_destroy(sock);
+-	return NULL;
++}
++
++struct IB_SOCK *ib_socket_create()
++{
++	struct rdma_cm_id *cm_id;
++	struct IB_SOCK *ret;
++	
++	cm_id = rdma_create_id(cm_handler, NULL, RDMA_PS_TCP, IB_QPT_RC);
++	if (IS_ERR(cm_id)) {
++		printk("error create cm_id %ld\n", PTR_ERR(cm_id));
++		return NULL;
++	}
++
++	ret = __ib_socket_create(cm_id);
++	if (ret == NULL)
++		rdma_destroy_id(cm_id);
++
++	return ret;
+ }
+ 
+ void ib_socket_destroy(struct IB_SOCK *sock)
+@@ -201,7 +273,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
  		printk("Failed to disconnect, conn: 0x%p err %d\n",
  			 sock,err);
  }
@@ -71,7 +197,7 @@ index fa47955..66acf02 100644
  static unsigned long __take_event(struct IB_SOCK *sock, unsigned long *e)
  {
  	unsigned long events;
-@@ -224,3 +227,43 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
+@@ -224,3 +296,43 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
  
  	return mask;
  }
