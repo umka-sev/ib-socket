@@ -1,0 +1,15 @@
+Bottom: 0b6425c4eb2400fcd4a766eb6e1d20493bc62966
+Top:    0b6425c4eb2400fcd4a766eb6e1d20493bc62966
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-15 12:45:24 +0300
+
+Introduce a server side code for a socket.
+ a) create a server socket
+ b) accept an incomming connect request
+ c) hello exchange
+
+
+
+---
+
+
