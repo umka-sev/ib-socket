@@ -116,7 +116,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 		sock_event_set(sock, POLLERR);
 	}
 	/* if we return an error, OFED treat it as critical error and kill an ID,
-	 * dobule destroy id will result a panic. Probably we may return it early sometimes
+	 * dobule destroy id will result a panic. LNet uses it way
 	 * to save a resources. */
 	return 0;
 }
