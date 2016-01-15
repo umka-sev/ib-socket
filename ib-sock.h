@@ -25,4 +25,8 @@ void ib_socket_disconnect(struct IB_SOCK *sock);
 /* sleep to wait poll event from socket */
 unsigned long ib_socket_poll(struct IB_SOCK *sock);
 
+int ib_socket_bind(struct IB_SOCK *sock, uint32_t addr, unsigned port);
+struct IB_SOCK *ib_socket_accept(struct IB_SOCK *parent);
+
+
 #endif

@@ -2,7 +2,7 @@
 
 #include <linux/delay.h>
 
-static unsigned int port = 998;
+static unsigned int port = 1998;
 const char *srv_addr = "172.18.56.132";
 static __u32 addr  = 0;
 
