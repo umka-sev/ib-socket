@@ -1,5 +1,5 @@
 Bottom: 199c14b7301f83f79b686d1d464572735fbe2db9
-Top:    adc309b640325cdfc40d1efd8a66f440e62c92ab
+Top:    0b6425c4eb2400fcd4a766eb6e1d20493bc62966
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-14 11:49:20 +0300
 
@@ -143,7 +143,7 @@ index e5f19fc..176b0c9 100644
 +
  #endif
 diff --git a/ib-sock.c b/ib-sock.c
-index 1c67337..fd1635f 100644
+index 1c67337..fa47955 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
 @@ -1,12 +1,82 @@
@@ -268,7 +268,7 @@ index 1c67337..fd1635f 100644
 +		sock_event_set(sock, POLLERR);
 +	}
 +	/* if we return an error, OFED treat it as critical error and kill an ID,
-+	 * dobule destroy id will result a panic. Probably we may return it early sometimes
++	 * dobule destroy id will result a panic. LNet uses it way
 +	 * to save a resources. */
 +	return 0;
  }
