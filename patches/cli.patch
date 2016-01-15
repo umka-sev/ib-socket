@@ -1,5 +1,5 @@
 Bottom: 199c14b7301f83f79b686d1d464572735fbe2db9
-Top:    0b6425c4eb2400fcd4a766eb6e1d20493bc62966
+Top:    4e8c93e7c7ca6ebbbc19ecf792e0fbbaf879f827
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-14 11:49:20 +0300
 
@@ -84,10 +84,10 @@ index e4d0f59..b6deb50 100644
 \ No newline at end of file
 +MODULE_LICENSE("GPL");
 diff --git a/ib-sock-int.h b/ib-sock-int.h
-index e5f19fc..176b0c9 100644
+index e5f19fc..84b91d6 100644
 --- a/ib-sock-int.h
 +++ b/ib-sock-int.h
-@@ -7,9 +7,54 @@
+@@ -7,9 +7,49 @@
  #include <rdma/ib_verbs.h>
  #include <rdma/rdma_cm.h>
  
@@ -106,11 +106,6 @@ index e5f19fc..176b0c9 100644
  	struct rdma_cm_id	*is_id;
 +
 +	unsigned long		is_flags;
-+	/* transfer related parts */
-+	/* completion events */
-+	struct ib_cq		*is_cq;
-+	/* queue pair to communicate between nodes */
-+	struct ib_qp		*is_qp;
 +
 +	/* event mask */
 +	unsigned long		is_events;
