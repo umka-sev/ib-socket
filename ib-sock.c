@@ -138,6 +138,9 @@ struct IB_SOCK *ib_socket_create()
 	}
 
 	sock->is_flags = 0;
+
+	INIT_LIST_HEAD(&sock->is_child);
+
 	sock->is_events = 0;
 	init_waitqueue_head(&sock->is_events_wait);
 	
