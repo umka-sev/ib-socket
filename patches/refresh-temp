@@ -1,0 +1,25 @@
+Bottom: 0b6425c4eb2400fcd4a766eb6e1d20493bc62966
+Top:    4e8c93e7c7ca6ebbbc19ecf792e0fbbaf879f827
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-15 13:24:21 +0300
+
+Refresh of cli.patch
+
+---
+
+diff --git a/ib-sock-int.h b/ib-sock-int.h
+index 176b0c9..84b91d6 100644
+--- a/ib-sock-int.h
++++ b/ib-sock-int.h
+@@ -22,11 +22,6 @@ struct IB_SOCK {
+ 	struct rdma_cm_id	*is_id;
+ 
+ 	unsigned long		is_flags;
+-	/* transfer related parts */
+-	/* completion events */
+-	struct ib_cq		*is_cq;
+-	/* queue pair to communicate between nodes */
+-	struct ib_qp		*is_qp;
+ 
+ 	/* event mask */
+ 	unsigned long		is_events;
