@@ -1,0 +1,86 @@
+Bottom: 8a283712a33d06509defa1d2a4fff8edd402f8bc
+Top:    adc309b640325cdfc40d1efd8a66f440e62c92ab
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-15 11:43:06 +0300
+
+Refresh of cli.patch
+
+---
+
+diff --git a/ib-sock.c b/ib-sock.c
+index 24ebe3b..fd1635f 100644
+--- a/ib-sock.c
++++ b/ib-sock.c
+@@ -32,8 +32,6 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 		ret = rdma_connect(sock->is_id, &conn_param);
+ 		if (ret)
+ 			printk("failure connecting: %d\n", ret);
+-		else
+-			sock->is_flags |= SOCK_CONNECTED;
+ 
+ 		break;
+ 	}
+@@ -52,10 +50,12 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 		 * in case server have a wrong version or capabilites */
+ 		const struct ib_hello *hello = event->param.conn.private_data;
+ 
++		sock->is_flags |= SOCK_CONNECTED;
+ 		if (hello->magic != IB_HELLO_MAGIC) {
+ 			ret = -EPROTO;
+ 			break;
+ 		}
++
+ 		sock_event_set(sock, POLLOUT);
+ 		break;
+ 	}
+@@ -92,10 +92,13 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 	/* some common errors */
+ 	case RDMA_CM_EVENT_ADDR_ERROR:
+ 	case RDMA_CM_EVENT_ROUTE_ERROR:
+-	case RDMA_CM_EVENT_CONNECT_ERROR:
+ 	case RDMA_CM_EVENT_UNREACHABLE:
++		ret = -EHOSTUNREACH;
++		break;
++	case RDMA_CM_EVENT_CONNECT_ERROR:
+ 	case RDMA_CM_EVENT_REJECTED:
+-		sock->is_flags |= SOCK_ERROR;
++		/* to decode a reject event, see srp_cm_rej_handler */
++		ret = -ECONNREFUSED;
+ 		break;
+ 	/* some hard errors to abort connection */
+ 	case RDMA_CM_EVENT_DISCONNECTED:
+@@ -104,6 +107,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 		break;
+ 	default:
+ 		printk("Unexpected RDMA CM event (%d)\n", event->event);
++		ret = -EINVAL;
+ 		break;
+ 	}
+ 
+@@ -111,7 +115,10 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 		sock->is_flags |= SOCK_ERROR;
+ 		sock_event_set(sock, POLLERR);
+ 	}
+-	return ret;
++	/* if we return an error, OFED treat it as critical error and kill an ID,
++	 * dobule destroy id will result a panic. Probably we may return it early sometimes
++	 * to save a resources. */
++	return 0;
+ }
+ 
+ struct IB_SOCK *ib_socket_create()
+@@ -126,9 +133,14 @@ struct IB_SOCK *ib_socket_create()
+ 					     RDMA_PS_TCP, IB_QPT_RC);
+ 	if (IS_ERR(sock->is_id)) {
+ 		printk("error create cm_id %ld\n", PTR_ERR(sock->is_id));
++		sock->is_id = NULL;
+ 		goto out_free;
+ 	}
+ 
++	sock->is_flags = 0;
++	sock->is_events = 0;
++	init_waitqueue_head(&sock->is_events_wait);
++	
+ 	printk("IB socket create %p\n", sock);
+ 	return sock;
+ out_free:
