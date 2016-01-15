@@ -1,5 +1,5 @@
 Bottom: 4e8c93e7c7ca6ebbbc19ecf792e0fbbaf879f827
-Top:    12dfa834998126520d8f8b3f6cb3f0165e93e490
+Top:    7ad6247784d9ec21c15709b193b73283274224a9
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-15 12:45:24 +0300
 
@@ -12,11 +12,57 @@ Introduce a server side code for a socket.
 
 ---
 
+diff --git a/cli.c b/cli.c
+index b6deb50..f0bcd39 100644
+--- a/cli.c
++++ b/cli.c
+@@ -2,7 +2,7 @@
+ 
+ #include <linux/delay.h>
+ 
+-static unsigned int port = 998;
++static unsigned int port = 1998;
+ const char *srv_addr = "172.18.56.132";
+ static __u32 addr  = 0;
+ 
+diff --git a/ib-sock-int.h b/ib-sock-int.h
+index 84b91d6..a934272 100644
+--- a/ib-sock-int.h
++++ b/ib-sock-int.h
+@@ -12,6 +12,8 @@
+ #define IB_ADDR_TIMEOUT 100
+ #define IB_ROUTE_TIMEOUT 100
+ 
++#define IB_LISTEN_QUEUE 128
++
+ enum ib_sock_flags {
+ 	SOCK_CONNECTED	= 1 << 0,
+ 	SOCK_ERROR	= 1 << 1,
+@@ -23,6 +25,9 @@ struct IB_SOCK {
+ 
+ 	unsigned long		is_flags;
+ 
++	/* pre-accepted sockets */
++	struct list_head	is_child;
++
+ 	/* event mask */
+ 	unsigned long		is_events;
+ 	wait_queue_head_t	is_events_wait;
 diff --git a/ib-sock.c b/ib-sock.c
-index fa47955..8b9565f 100644
+index fa47955..66acf02 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
-@@ -201,7 +201,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
+@@ -138,6 +138,9 @@ struct IB_SOCK *ib_socket_create()
+ 	}
+ 
+ 	sock->is_flags = 0;
++
++	INIT_LIST_HEAD(&sock->is_child);
++
+ 	sock->is_events = 0;
+ 	init_waitqueue_head(&sock->is_events_wait);
+ 	
+@@ -201,7 +204,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
  		printk("Failed to disconnect, conn: 0x%p err %d\n",
  			 sock,err);
  }
@@ -25,7 +71,7 @@ index fa47955..8b9565f 100644
  static unsigned long __take_event(struct IB_SOCK *sock, unsigned long *e)
  {
  	unsigned long events;
-@@ -224,3 +224,43 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
+@@ -224,3 +227,43 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
  
  	return mask;
  }
@@ -83,3 +129,34 @@ index 533e991..0a2f9a9 100644
 +
  #endif
 \ No newline at end of file
+diff --git a/srv.c b/srv.c
+index 801b561..76fb030 100644
+--- a/srv.c
++++ b/srv.c
+@@ -1,14 +1,26 @@
+ #include "ib-sock.h"
+ 
++
++
+ static int __init
+ srv_init(void)
+ {
+ 	struct IB_SOCK *sock;
++	unsigned long event;
++	int ret;
+ 
+ 	sock = ib_socket_create();
+ 	if (sock == NULL)
+ 		return -ENOMEM;
+ 
++	ret = ib_socket_bind(sock, INADDR_ANY, 1998);
++	if (ret < 0)
++		goto out;
++
++	event = ib_socket_poll(sock);
++	/* wait a POLLIN to say new connection ready to */
++
++out:
+ 	ib_socket_destroy(sock);
+ 	return 0;
+ }
