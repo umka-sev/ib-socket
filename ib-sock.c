@@ -138,6 +138,9 @@ struct IB_SOCK *ib_socket_create()
 	}
 
 	sock->is_flags = 0;
+
+	INIT_LIST_HEAD(&sock->is_child);
+
 	sock->is_events = 0;
 	init_waitqueue_head(&sock->is_events_wait);
 	
@@ -201,7 +204,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
 		printk("Failed to disconnect, conn: 0x%p err %d\n",
 			 sock,err);
 }
-
+/*****************************************************************************************/
 static unsigned long __take_event(struct IB_SOCK *sock, unsigned long *e)
 {
 	unsigned long events;
@@ -223,4 +226,44 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
 		mask |= POLLERR;
 
 	return mask;
+}
+
+/*****************************************************************************************/
+int ib_socket_bind(struct IB_SOCK *sock, uint32_t addr, unsigned port)
+{
+	struct sockaddr_in  sin;
+	int ret;
+
+	sin.sin_family = AF_INET,
+	sin.sin_addr.s_addr = (__force u32)htonl(addr);
+	sin.sin_port = (__force u16)htons(port);
+
+	ret = rdma_bind_addr(sock->is_id, (struct sockaddr *)&sin);
+	if (ret) {
+		printk(KERN_ERR "RDMA: failed to setup listener, "
+		       "rdma_bind_addr() returned %d\n", ret);
+		goto out;
+	}
+
+	ret = rdma_listen(sock->is_id, IB_LISTEN_QUEUE);
+	if (ret) {
+		printk(KERN_ERR "RDMA: failed to setup listener, "
+		       "rdma_listen() returned %d\n", ret);
+		goto out;
+	}
+	/* HELLO will done via CM (mad) packets */
+out:
+	return ret;
+
+}
+
+struct IB_SOCK *ib_socket_accept(struct IB_SOCK *parent)
+{
+	struct IB_SOCK *sock;
+
+	sock = list_first_entry_or_null(&parent->is_child, struct IB_SOCK, is_child);
+	if (sock) {
+		list_del_init(&sock->is_child);
+	}
+	return sock;
 }
