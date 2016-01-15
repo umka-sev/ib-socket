@@ -22,11 +22,6 @@ struct IB_SOCK {
 	struct rdma_cm_id	*is_id;
 
 	unsigned long		is_flags;
-	/* transfer related parts */
-	/* completion events */
-	struct ib_cq		*is_cq;
-	/* queue pair to communicate between nodes */
-	struct ib_qp		*is_qp;
 
 	/* event mask */
 	unsigned long		is_events;
