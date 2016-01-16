@@ -1,5 +1,5 @@
-Bottom: 5e1ce90875ccd0e031058cd93179e55e43704bf0
-Top:    be1adbff266685f93dcf753fb5d3ee0a98f7aa34
+Bottom: 7411129e6c92aae16c859c12b7fd9fd8999a12c3
+Top:    4fdac40b93cac58dc6e13455190cf5badb361b2b
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-15 12:45:24 +0300
 
@@ -26,10 +26,10 @@ index b6deb50..f0bcd39 100644
  static __u32 addr  = 0;
  
 diff --git a/ib-sock-int.h b/ib-sock-int.h
-index 84b91d6..a934272 100644
+index add0b53..c978399 100644
 --- a/ib-sock-int.h
 +++ b/ib-sock-int.h
-@@ -12,6 +12,8 @@
+@@ -10,6 +10,8 @@
  #define IB_ADDR_TIMEOUT 100
  #define IB_ROUTE_TIMEOUT 100
  
@@ -38,7 +38,7 @@ index 84b91d6..a934272 100644
  enum ib_sock_flags {
  	SOCK_CONNECTED	= 1 << 0,
  	SOCK_ERROR	= 1 << 1,
-@@ -23,6 +25,9 @@ struct IB_SOCK {
+@@ -21,6 +23,9 @@ struct IB_SOCK {
  
  	unsigned long		is_flags;
  

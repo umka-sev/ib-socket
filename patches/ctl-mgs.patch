@@ -1,5 +1,5 @@
-Bottom: be1adbff266685f93dcf753fb5d3ee0a98f7aa34
-Top:    65d2172e4a1eb2f12744515f8cc61509bbb7fd0f
+Bottom: 4fdac40b93cac58dc6e13455190cf5badb361b2b
+Top:    bfc785d252677748f7512d33d3071fbfd3a5a994
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-16 21:11:03 +0300
 
@@ -35,10 +35,10 @@ index 590400a..313194f 100644
      netcli-objs	:= cli.o $(obj_ib-y)
  else
 diff --git a/ib-sock-int.h b/ib-sock-int.h
-index a934272..14179f7 100644
+index c978399..ad39669 100644
 --- a/ib-sock-int.h
 +++ b/ib-sock-int.h
-@@ -19,6 +19,19 @@ enum ib_sock_flags {
+@@ -17,6 +17,19 @@ enum ib_sock_flags {
  	SOCK_ERROR	= 1 << 1,
  };
  
