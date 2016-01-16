@@ -100,6 +100,7 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 		}
 
 		memset(&hello_ack, 0, sizeof hello_ack);
+		hello_ack.magic = IB_HELLO_MAGIC;
 
 		memset(&conn_param, 0, sizeof conn_param);
 		conn_param.private_data_len = sizeof hello_ack;
@@ -157,6 +158,8 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 	case RDMA_CM_EVENT_CONNECT_ERROR:
 	case RDMA_CM_EVENT_REJECTED:
 		/* to decode a reject event, see srp_cm_rej_handler */
+		/* reject event hit in two cases - none bind ports, or disconnected on 
+		 * other side */
 		ret = -ECONNREFUSED;
 		break;
 	/* some hard errors to abort connection */
