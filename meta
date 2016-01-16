@@ -1,10 +1,9 @@
 Version: 1
-Previous: e088d5c6f4dcd3d57b8875a039e5859891209853
-Head: 748b0f5a852544dbd45fbc5f6a182b9d35bd15d7
+Previous: 507cb566078071a12a74db44189c40028d317697
+Head: 3f772a0dbde1ff0bd98c6af68c128ddeda6fbfdd
 Applied:
   ib-sock-into.patch: c21ffebdf559a968b576abe5b2fa07716e4ff72d
-  cli.patch: f36f926e6b6c6c3b8ddb48e636d0c5005441516b
-  refresh-temp: 748b0f5a852544dbd45fbc5f6a182b9d35bd15d7
+  cli.patch: 3f772a0dbde1ff0bd98c6af68c128ddeda6fbfdd
 Unapplied:
   srv.patch: 6443cdd392ead7befc35b39d1c1686a1a9db3f02
   ctl-mgs.patch: 41aa1bcbfdeeb475179d3cb6623322d5a8fc4b54

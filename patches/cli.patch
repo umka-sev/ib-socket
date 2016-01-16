@@ -1,5 +1,5 @@
 Bottom: 199c14b7301f83f79b686d1d464572735fbe2db9
-Top:    5e1ce90875ccd0e031058cd93179e55e43704bf0
+Top:    7411129e6c92aae16c859c12b7fd9fd8999a12c3
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-14 11:49:20 +0300
 
@@ -84,15 +84,13 @@ index e4d0f59..b6deb50 100644
 \ No newline at end of file
 +MODULE_LICENSE("GPL");
 diff --git a/ib-sock-int.h b/ib-sock-int.h
-index e5f19fc..84b91d6 100644
+index e5f19fc..add0b53 100644
 --- a/ib-sock-int.h
 +++ b/ib-sock-int.h
-@@ -7,9 +7,49 @@
+@@ -7,9 +7,47 @@
  #include <rdma/ib_verbs.h>
  #include <rdma/rdma_cm.h>
  
-+#define IB_CQ_EVENTS_MAX 128
-+
 +#define IB_ADDR_TIMEOUT 100
 +#define IB_ROUTE_TIMEOUT 100
 +
