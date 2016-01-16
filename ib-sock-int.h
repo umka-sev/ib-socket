@@ -17,11 +17,21 @@ enum ib_sock_flags {
 	SOCK_ERROR	= 1 << 1,
 };
 
+struct ib_sock_mem {
+	/* protection domain */
+	struct ib_pd		*ism_pd;
+	/* memory window to map.
+	 * all ? or most cards may work with single == global MR  */
+	struct ib_mr		*ism_mr;
+};
+
 struct IB_SOCK {
 	/* primary OFED stack ID */
 	struct rdma_cm_id	*is_id;
 
 	unsigned long		is_flags;
+
+	struct ib_sock_mem	is_mem;
 
 	/* pre-accepted sockets */
 	spinlock_t		is_child_lock;
@@ -39,7 +49,6 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
 	wake_up(&sock->is_events_wait);
 }
 
-
 /* messages on wire */
 #define WIRE_ATTR	__attribute__((packed))
 
@@ -49,6 +58,11 @@ struct ib_hello {
 	__u32	magic;
 } WIRE_ATTR;
 
+
+/* mem.c */
+/* init function responsible to fill an number WR / SGE per socket*/
+int ib_sock_mem_init(struct IB_SOCK *sock);
+void ib_sock_mem_fini(struct IB_SOCK *sock);
 
 
 /* util.c */
