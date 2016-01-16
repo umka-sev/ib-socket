@@ -7,11 +7,12 @@ IB don't provide generic way to know about transfer.
 So we need to define a some control protocol to notify peer about
 transfer.
 One of two ways may choosed for it.
-1) use a generic send / recv functions 
+1) use a generic send / recv functions
 2) use MAD (CM) message to exchange a transfer parameters.
 
 use a (1) for initial implementation.
 
+part I - send control message.
 
 
 ---
