@@ -7,6 +7,8 @@
 #include <rdma/ib_verbs.h>
 #include <rdma/rdma_cm.h>
 
+#define IB_CQ_EVENTS_MAX 128
+
 #define IB_ADDR_TIMEOUT 100
 #define IB_ROUTE_TIMEOUT 100
 
@@ -15,6 +17,19 @@
 enum ib_sock_flags {
 	SOCK_CONNECTED	= 1 << 0,
 	SOCK_ERROR	= 1 << 1,
+};
+
+struct ib_sock_mem {
+	/* protection domain */
+	struct ib_pd		*ism_pd;
+	/* memory window to map.
+	 * all ? or most cards may work with single == global MR  */
+	struct ib_mr		*ism_mr;
+	
+	/* # send work items for single transfer */
+	unsigned		ism_wr_count;
+	/* ...and their memory */
+	unsigned		ism_sge_count;
 };
 
 struct IB_SOCK {
@@ -38,7 +53,6 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
 	wake_up(&sock->is_events_wait);
 }
 
-
 /* messages on wire */
 #define WIRE_ATTR	__attribute__((packed))
 
@@ -48,6 +62,11 @@ struct ib_hello {
 	__u32	magic;
 } WIRE_ATTR;
 
+
+/* mem.c */
+/* init function responsible to fill an number WR / SGE per socket*/
+int ib_sock_mem_init(struct IB_SOCK *sock);
+void ib_sock_mem_fini(struct IB_SOCK *sock);
 
 
 /* util.c */
