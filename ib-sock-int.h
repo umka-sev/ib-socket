@@ -19,6 +19,19 @@ enum ib_sock_flags {
 	SOCK_ERROR	= 1 << 1,
 };
 
+struct ib_sock_mem {
+	/* protection domain */
+	struct ib_pd		*ism_pd;
+	/* memory window to map.
+	 * all ? or most cards may work with single == global MR  */
+	struct ib_mr		*ism_mr;
+	
+	/* # send work items for single transfer */
+	unsigned		ism_wr_count;
+	/* ...and their memory */
+	unsigned		ism_sge_count;
+};
+
 struct IB_SOCK {
 	/* primary OFED stack ID */
 	struct rdma_cm_id	*is_id;
