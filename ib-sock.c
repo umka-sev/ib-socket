@@ -1,8 +1,26 @@
 #include "ib-sock.h"
 #include "ib-sock-int.h"
 
-struct IB_SOCK *__ib_socket_create(struct rdma_cm_id *cm_id);
+static struct IB_SOCK *__ib_socket_create(struct rdma_cm_id *cm_id);
 
+/* allocate a sort of resources for socket, such as 
+ * 1) memory region to map a requests
+ */
+static int ib_sock_resource_alloc(struct IB_SOCK *sock)
+{
+	int ret;
+
+	ret = ib_sock_mem_init(sock);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+static void ib_sock_resource_free(struct IB_SOCK *sock)
+{
+	ib_sock_mem_fini(sock);
+}
 
 static int
 cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
@@ -59,6 +77,11 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 			break;
 		}
 
+		/* connect response done, hello verified - allocate resources and go */
+		ret = ib_sock_resource_alloc(sock);
+		if (ret < 0)
+			break;
+
 		sock_event_set(sock, POLLOUT);
 		break;
 	}
@@ -71,6 +94,13 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 	return ret;
 }
 /**************************************************************************************/
+static void server_error_accept(struct IB_SOCK *sock)
+{
+	/* will destroy after exit from event cb */
+	sock->is_id = NULL;
+	ib_socket_destroy(sock);
+}
+
 static int
 cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 {
@@ -94,10 +124,16 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 		}
 
 		sock = __ib_socket_create(cmid);
-		if (sock != NULL) {
+		if (sock == NULL) {
 			printk("error accept \n");
 			ret = -ENOMEM;
 			break;
+		}
+
+		ret = ib_sock_resource_alloc(sock);
+		if (ret < 0) {
+			server_error_accept(sock);
+			return ret;
 		}
 
 		memset(&hello_ack, 0, sizeof hello_ack);
@@ -112,9 +148,7 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 
 		ret = rdma_accept(sock->is_id, &conn_param);
 		if (ret < 0) {
-			/* will destroy after exit from event cb */
-			sock->is_id = NULL;
-			ib_socket_destroy(sock);
+			server_error_accept(sock);
 			return ret;
 		}
 
@@ -239,6 +273,8 @@ struct IB_SOCK *ib_socket_create()
 void ib_socket_destroy(struct IB_SOCK *sock)
 {
 	printk("IB socket destroy %p\n", sock);
+
+	ib_sock_resource_free(sock);
 
 	if (sock->is_id)
 		rdma_destroy_id(sock->is_id);
