@@ -1,0 +1,19 @@
+Bottom: be1adbff266685f93dcf753fb5d3ee0a98f7aa34
+Top:    be1adbff266685f93dcf753fb5d3ee0a98f7aa34
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-16 21:11:03 +0300
+
+IB don't provide generic way to know about transfer.
+So we need to define a some control protocol to notify peer about
+transfer.
+One of two ways may choosed for it.
+1) use a generic send / recv functions 
+2) use MAD (CM) message to exchange a transfer parameters.
+
+use a (1) for initial implementation.
+
+
+
+---
+
+
