@@ -1,5 +1,5 @@
 Bottom: 4e8c93e7c7ca6ebbbc19ecf792e0fbbaf879f827
-Top:    596c118522e14a7e8fa8e2d636285ac50ddb2319
+Top:    06cf0bab4aceaa4f866df3baf5c458fcdaf35579
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-15 12:45:24 +0300
 
@@ -49,7 +49,7 @@ index 84b91d6..a934272 100644
  	unsigned long		is_events;
  	wait_queue_head_t	is_events_wait;
 diff --git a/ib-sock.c b/ib-sock.c
-index fa47955..6eab374 100644
+index fa47955..ae6a5e7 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
 @@ -1,6 +1,9 @@
@@ -62,7 +62,7 @@ index fa47955..6eab374 100644
  static int
  cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  {
-@@ -68,6 +71,56 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -68,6 +71,57 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  	return ret;
  }
  
@@ -95,6 +95,7 @@ index fa47955..6eab374 100644
 +		}
 +
 +		memset(&hello_ack, 0, sizeof hello_ack);
++		hello_ack.magic = IB_HELLO_MAGIC;
 +
 +		memset(&conn_param, 0, sizeof conn_param);
 +		conn_param.private_data_len = sizeof hello_ack;
@@ -119,7 +120,7 @@ index fa47955..6eab374 100644
  
  static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  {
-@@ -88,6 +141,12 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -88,6 +142,12 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  		break;
  	/* server related events */
  	case RDMA_CM_EVENT_CONNECT_REQUEST:
@@ -132,7 +133,16 @@ index fa47955..6eab374 100644
  		break;
  	/* some common errors */
  	case RDMA_CM_EVENT_ADDR_ERROR:
-@@ -121,7 +180,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -98,6 +158,8 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 	case RDMA_CM_EVENT_CONNECT_ERROR:
+ 	case RDMA_CM_EVENT_REJECTED:
+ 		/* to decode a reject event, see srp_cm_rej_handler */
++		/* reject event hit in two cases - none bind ports, or disconnected on 
++		 * other side */
+ 		ret = -ECONNREFUSED;
+ 		break;
+ 	/* some hard errors to abort connection */
+@@ -121,7 +183,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  	return 0;
  }
  
@@ -141,7 +151,7 @@ index fa47955..6eab374 100644
  {
  	struct IB_SOCK *sock;
  
-@@ -129,23 +188,36 @@ struct IB_SOCK *ib_socket_create()
+@@ -129,23 +191,36 @@ struct IB_SOCK *ib_socket_create()
  	if (sock == NULL)
  		return NULL;
  
@@ -188,7 +198,7 @@ index fa47955..6eab374 100644
  }
  
  void ib_socket_destroy(struct IB_SOCK *sock)
-@@ -201,7 +273,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
+@@ -201,7 +276,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
  		printk("Failed to disconnect, conn: 0x%p err %d\n",
  			 sock,err);
  }
@@ -197,7 +207,7 @@ index fa47955..6eab374 100644
  static unsigned long __take_event(struct IB_SOCK *sock, unsigned long *e)
  {
  	unsigned long events;
-@@ -224,3 +296,43 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
+@@ -224,3 +299,43 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
  
  	return mask;
  }
