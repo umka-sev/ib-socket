@@ -7,8 +7,6 @@
 #include <rdma/ib_verbs.h>
 #include <rdma/rdma_cm.h>
 
-#define IB_CQ_EVENTS_MAX 128
-
 #define IB_ADDR_TIMEOUT 100
 #define IB_ROUTE_TIMEOUT 100
 
