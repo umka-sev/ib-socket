@@ -1,0 +1,30 @@
+Bottom: 596c118522e14a7e8fa8e2d636285ac50ddb2319
+Top:    06cf0bab4aceaa4f866df3baf5c458fcdaf35579
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-16 21:05:10 +0300
+
+Refresh of srv.patch
+
+---
+
+diff --git a/ib-sock.c b/ib-sock.c
+index 6eab374..ae6a5e7 100644
+--- a/ib-sock.c
++++ b/ib-sock.c
+@@ -100,6 +100,7 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 		}
+ 
+ 		memset(&hello_ack, 0, sizeof hello_ack);
++		hello_ack.magic = IB_HELLO_MAGIC;
+ 
+ 		memset(&conn_param, 0, sizeof conn_param);
+ 		conn_param.private_data_len = sizeof hello_ack;
+@@ -157,6 +158,8 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 	case RDMA_CM_EVENT_CONNECT_ERROR:
+ 	case RDMA_CM_EVENT_REJECTED:
+ 		/* to decode a reject event, see srp_cm_rej_handler */
++		/* reject event hit in two cases - none bind ports, or disconnected on 
++		 * other side */
+ 		ret = -ECONNREFUSED;
+ 		break;
+ 	/* some hard errors to abort connection */
