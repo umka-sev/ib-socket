@@ -14,6 +14,11 @@ use a (1) for initial implementation.
 
 part I - init transfer related structures
 
+IB uses QP - queue pair to transfer data between nodes.
+CP is completion pair - transmission events callback.
+Control messages uses an global memory region with predefined
+key to mark an transfer.
+
 
 ---
 
