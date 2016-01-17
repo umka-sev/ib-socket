@@ -1,5 +1,5 @@
 Bottom: 7411129e6c92aae16c859c12b7fd9fd8999a12c3
-Top:    4fdac40b93cac58dc6e13455190cf5badb361b2b
+Top:    552d3ddcd525cd061062030a789eccb57e69168d
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-15 12:45:24 +0300
 
@@ -26,7 +26,7 @@ index b6deb50..f0bcd39 100644
  static __u32 addr  = 0;
  
 diff --git a/ib-sock-int.h b/ib-sock-int.h
-index add0b53..c978399 100644
+index add0b53..d2a1904 100644
 --- a/ib-sock-int.h
 +++ b/ib-sock-int.h
 @@ -10,6 +10,8 @@
@@ -38,18 +38,19 @@ index add0b53..c978399 100644
  enum ib_sock_flags {
  	SOCK_CONNECTED	= 1 << 0,
  	SOCK_ERROR	= 1 << 1,
-@@ -21,6 +23,9 @@ struct IB_SOCK {
+@@ -21,6 +23,10 @@ struct IB_SOCK {
  
  	unsigned long		is_flags;
  
 +	/* pre-accepted sockets */
++	spinlock_t		is_child_lock;
 +	struct list_head	is_child;
 +
  	/* event mask */
  	unsigned long		is_events;
  	wait_queue_head_t	is_events_wait;
 diff --git a/ib-sock.c b/ib-sock.c
-index fa47955..ae6a5e7 100644
+index fa47955..3deb291 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
 @@ -1,6 +1,9 @@
@@ -62,10 +63,11 @@ index fa47955..ae6a5e7 100644
  static int
  cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  {
-@@ -68,6 +71,57 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -67,6 +70,69 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 	printk("client CM event ret %d\n", ret);
  	return ret;
  }
- 
++/**************************************************************************************/
 +static int
 +cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 +{
@@ -77,6 +79,7 @@ index fa47955..ae6a5e7 100644
 +		const struct ib_hello *hello = event->param.conn.private_data;
 +		struct ib_hello hello_ack;
 +		struct rdma_conn_param	conn_param;
++		struct IB_SOCK *parent = cmid->context;
 +		struct IB_SOCK *sock;
 +
 +		if (hello->magic != IB_HELLO_MAGIC) {
@@ -88,7 +91,7 @@ index fa47955..ae6a5e7 100644
 +		}
 +
 +		sock = __ib_socket_create(cmid);
-+		if (ret != 0) {
++		if (sock != NULL) {
 +			printk("error accept \n");
 +			ret = -ENOMEM;
 +			break;
@@ -105,6 +108,17 @@ index fa47955..ae6a5e7 100644
 +		conn_param.retry_count = 10;
 +
 +		ret = rdma_accept(sock->is_id, &conn_param);
++		if (ret < 0) {
++			/* will destroy after exit from event cb */
++			sock->is_id == NULL;
++			ib_socket_destroy(sock);
++			return ret;
++		}
++
++		spin_lock(&parent->is_child_lock);
++		list_add(&sock->is_child, &parent->is_child);
++		spin_unlock(&parent->is_child_lock);
++
 +		break;
 +	}
 +	default:
@@ -116,11 +130,10 @@ index fa47955..ae6a5e7 100644
 +
 +	return ret;
 +}
-+
+ 
  
  static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
- {
-@@ -88,6 +142,12 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -88,6 +154,12 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  		break;
  	/* server related events */
  	case RDMA_CM_EVENT_CONNECT_REQUEST:
@@ -133,7 +146,7 @@ index fa47955..ae6a5e7 100644
  		break;
  	/* some common errors */
  	case RDMA_CM_EVENT_ADDR_ERROR:
-@@ -98,6 +158,8 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -98,6 +170,8 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  	case RDMA_CM_EVENT_CONNECT_ERROR:
  	case RDMA_CM_EVENT_REJECTED:
  		/* to decode a reject event, see srp_cm_rej_handler */
@@ -142,7 +155,7 @@ index fa47955..ae6a5e7 100644
  		ret = -ECONNREFUSED;
  		break;
  	/* some hard errors to abort connection */
-@@ -121,7 +183,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -121,7 +195,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  	return 0;
  }
  
@@ -151,7 +164,7 @@ index fa47955..ae6a5e7 100644
  {
  	struct IB_SOCK *sock;
  
-@@ -129,23 +191,36 @@ struct IB_SOCK *ib_socket_create()
+@@ -129,23 +203,37 @@ struct IB_SOCK *ib_socket_create()
  	if (sock == NULL)
  		return NULL;
  
@@ -168,6 +181,7 @@ index fa47955..ae6a5e7 100644
  	sock->is_flags = 0;
 +
 +	INIT_LIST_HEAD(&sock->is_child);
++	spin_lock_init(&sock->is_child_lock);
 +
  	sock->is_events = 0;
  	init_waitqueue_head(&sock->is_events_wait);
@@ -198,7 +212,7 @@ index fa47955..ae6a5e7 100644
  }
  
  void ib_socket_destroy(struct IB_SOCK *sock)
-@@ -201,7 +276,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
+@@ -201,7 +289,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
  		printk("Failed to disconnect, conn: 0x%p err %d\n",
  			 sock,err);
  }
@@ -207,7 +221,7 @@ index fa47955..ae6a5e7 100644
  static unsigned long __take_event(struct IB_SOCK *sock, unsigned long *e)
  {
  	unsigned long events;
-@@ -224,3 +299,43 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
+@@ -224,3 +312,46 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
  
  	return mask;
  }
@@ -245,10 +259,13 @@ index fa47955..ae6a5e7 100644
 +{
 +	struct IB_SOCK *sock;
 +
++	spin_lock(&parent->is_child_lock);
 +	sock = list_first_entry_or_null(&parent->is_child, struct IB_SOCK, is_child);
 +	if (sock) {
++		/* none can touch new socket until it accepted */
 +		list_del_init(&sock->is_child);
 +	}
++	spin_unlock(&parent->is_child_lock);
 +	return sock;
 +}
 diff --git a/ib-sock.h b/ib-sock.h
