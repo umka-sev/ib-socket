@@ -24,6 +24,7 @@ struct IB_SOCK {
 	unsigned long		is_flags;
 
 	/* pre-accepted sockets */
+	spinlock_t		is_child_lock;
 	struct list_head	is_child;
 
 	/* event mask */
