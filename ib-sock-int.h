@@ -12,6 +12,12 @@
 
 #define IB_LISTEN_QUEUE 128
 
+/* just one control message in flight */
+#define IB_MAX_PARALLEL	 1
+
+/* 1 RX + 1 TX in flight */
+#define IB_CQ_EVENTS_MAX (IB_MAX_PARALLEL) * 2
+
 enum ib_sock_flags {
 	SOCK_CONNECTED	= 1 << 0,
 	SOCK_ERROR	= 1 << 1,
@@ -23,6 +29,13 @@ struct ib_sock_mem {
 	/* memory window to map.
 	 * all ? or most cards may work with single == global MR  */
 	struct ib_mr		*ism_mr;
+
+	/* # send work items */
+	unsigned		ism_wr_count;
+
+	/* ...and their memory */
+	unsigned		ism_sge_count;
+
 };
 
 struct IB_SOCK {
@@ -32,6 +45,14 @@ struct IB_SOCK {
 	unsigned long		is_flags;
 
 	struct ib_sock_mem	is_mem;
+
+	/* transfer related parts */
+	/* completion events */
+	struct ib_cq		*is_cq;
+	/* queue pair to communicate between nodes */
+	/* we may create a per CPU QP to reduce a contention
+	 * on single QP */
+	struct ib_qp		*is_qp;
 
 	/* pre-accepted sockets */
 	spinlock_t		is_child_lock;
