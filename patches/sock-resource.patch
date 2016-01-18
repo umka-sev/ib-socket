@@ -1,5 +1,5 @@
 Bottom: 6211092ebf504eb3de35d1aa2382279109f06fd4
-Top:    086ca3722f3d976eace2df4dec717bea2f3aab52
+Top:    2976fa73133e0a1bc27b2680b0772a8ac0bd13b2
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-16 21:11:03 +0300
 
@@ -157,7 +157,7 @@ index 0000000..4976a3f
 +	ib_sock_mem_fini_common(sock);
 +}
 diff --git a/ib-sock.c b/ib-sock.c
-index c79a279..ea0a8e7 100644
+index c79a279..7367020 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
 @@ -1,8 +1,26 @@
@@ -214,7 +214,14 @@ index c79a279..ea0a8e7 100644
  static int
  cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  {
-@@ -100,6 +130,12 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -94,12 +124,18 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 		}
+ 
+ 		sock = __ib_socket_create(cmid);
+-		if (sock != NULL) {
++		if (sock == NULL) {
+ 			printk("error accept \n");
+ 			ret = -ENOMEM;
  			break;
  		}
  
@@ -237,3 +244,52 @@ index c79a279..ea0a8e7 100644
 +			server_error_accept(sock);
  			return ret;
  		}
+ 
+@@ -122,6 +156,8 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+ 		list_add(&sock->is_child, &parent->is_child);
+ 		spin_unlock(&parent->is_child_lock);
+ 
++		sock_event_set(parent, POLLIN);
++
+ 		break;
+ 	}
+ 	default:
+@@ -240,6 +276,8 @@ void ib_socket_destroy(struct IB_SOCK *sock)
+ {
+ 	printk("IB socket destroy %p\n", sock);
+ 
++	ib_sock_resource_free(sock);
++
+ 	if (sock->is_id)
+ 		rdma_destroy_id(sock->is_id);
+ 	kfree(sock);
+@@ -353,5 +391,6 @@ struct IB_SOCK *ib_socket_accept(struct IB_SOCK *parent)
+ 		list_del_init(&sock->is_child);
+ 	}
+ 	spin_unlock(&parent->is_child_lock);
++	printk("Accept returned %p\n", sock);
+ 	return sock;
+ }
+diff --git a/srv.c b/srv.c
+index e09d9d1..6f350e9 100644
+--- a/srv.c
++++ b/srv.c
+@@ -6,7 +6,7 @@ static int __init
+ srv_init(void)
+ {
+ 	struct IB_SOCK *sock, *sock_child = NULL;
+-	unsigned long event;
++	unsigned long event = 0;
+ 	int ret;
+ 
+ 	sock = ib_socket_create();
+@@ -19,7 +19,8 @@ srv_init(void)
+ 
+ 	/* wait incomming connect */
+ 	while ((event & POLLIN) == 0) {
+-	event = ib_socket_poll(sock);
++		event = ib_socket_poll(sock);
++		printk("srv got event %lx\n", event);
+ 		/* wait a POLLIN to say new connection ready to */
+ 		if ((event & POLLERR) != 0)
+ 			goto out;
