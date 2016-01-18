@@ -38,7 +38,6 @@ static void ib_sock_mem_fini_common(struct IB_SOCK *sock)
 
 int ib_sock_mem_init(struct IB_SOCK *sock)
 {
-	int i;
 	int ret;
 
 	ret = ib_sock_mem_init_common(sock);

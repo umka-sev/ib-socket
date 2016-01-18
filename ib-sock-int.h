@@ -38,6 +38,8 @@ struct IB_SOCK {
 
 	unsigned long		is_flags;
 
+	struct ib_sock_mem	is_mem;
+
 	/* pre-accepted sockets */
 	spinlock_t		is_child_lock;
 	struct list_head	is_child;
