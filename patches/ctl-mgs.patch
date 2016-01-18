@@ -1,5 +1,5 @@
-Bottom: 4fdac40b93cac58dc6e13455190cf5badb361b2b
-Top:    729121d3fa01a451adc05b5e850a059edd49d552
+Bottom: 599aa3d7b298b76d67c73ec1d45cbd6fbb325324
+Top:    b67ec2cadb5026be96a8d75b90f22d6ed2640510
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-16 21:11:03 +0300
 
@@ -35,7 +35,7 @@ index 590400a..313194f 100644
      netcli-objs	:= cli.o $(obj_ib-y)
  else
 diff --git a/ib-sock-int.h b/ib-sock-int.h
-index c978399..653cec8 100644
+index d2a1904..09de381 100644
 --- a/ib-sock-int.h
 +++ b/ib-sock-int.h
 @@ -7,6 +7,8 @@
@@ -67,7 +67,7 @@ index c978399..653cec8 100644
  struct IB_SOCK {
  	/* primary OFED stack ID */
  	struct rdma_cm_id	*is_id;
-@@ -38,7 +53,6 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
+@@ -39,7 +54,6 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
  	wake_up(&sock->is_events_wait);
  }
  
@@ -75,7 +75,7 @@ index c978399..653cec8 100644
  /* messages on wire */
  #define WIRE_ATTR	__attribute__((packed))
  
-@@ -49,6 +63,11 @@ struct ib_hello {
+@@ -50,6 +64,11 @@ struct ib_hello {
  } WIRE_ATTR;
  
  
