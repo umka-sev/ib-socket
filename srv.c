@@ -6,7 +6,7 @@ static int __init
 srv_init(void)
 {
 	struct IB_SOCK *sock, *sock_child = NULL;
-	unsigned long event;
+	unsigned long event = 0;
 	int ret;
 
 	sock = ib_socket_create();
@@ -19,7 +19,8 @@ srv_init(void)
 
 	/* wait incomming connect */
 	while ((event & POLLIN) == 0) {
-	event = ib_socket_poll(sock);
+		event = ib_socket_poll(sock);
+		printk("srv got event %lx\n", event);
 		/* wait a POLLIN to say new connection ready to */
 		if ((event & POLLERR) != 0)
 			goto out;

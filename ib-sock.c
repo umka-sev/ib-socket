@@ -122,6 +122,8 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 		list_add(&sock->is_child, &parent->is_child);
 		spin_unlock(&parent->is_child_lock);
 
+		sock_event_set(parent, POLLIN);
+
 		break;
 	}
 	default:
@@ -353,5 +355,6 @@ struct IB_SOCK *ib_socket_accept(struct IB_SOCK *parent)
 		list_del_init(&sock->is_child);
 	}
 	spin_unlock(&parent->is_child_lock);
+	printk("Accept returned %p\n", sock);
 	return sock;
 }
