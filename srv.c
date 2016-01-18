@@ -27,12 +27,13 @@ srv_init(void)
 	/* have incomming event, so socket is ready */
 	sock_child = ib_socket_accept(sock);
 	BUG_ON(sock_child == NULL);
-
+#if 0
 	while ( 1 ) {
 		event = ib_socket_poll(sock_child);
 		if (event & POLLERR)
 			break;
 	}
+#endif
 	ib_socket_destroy(sock_child);
 out:
 	ib_socket_destroy(sock);
