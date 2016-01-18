@@ -28,5 +28,7 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock);
 int ib_socket_bind(struct IB_SOCK *sock, uint32_t addr, unsigned port);
 struct IB_SOCK *ib_socket_accept(struct IB_SOCK *parent);
 
+/* send some amount data over wire */
+size_t ib_socket_write(struct IB_SOCK *sock, void *buf, size_t size);
 
 #endif
