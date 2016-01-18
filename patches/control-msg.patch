@@ -1,0 +1,14 @@
+Bottom: d9d06dd2c8c4a1f327d26ea00bfcac750a011f8c
+Top:    d9d06dd2c8c4a1f327d26ea00bfcac750a011f8c
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-18 21:42:27 +0300
+
+IB don't have own notification about transfers, 
+so expect each consumer will implement an own protocol.
+lets add a dma premapped messages to ability to transfer 
+or fill with incomming data.
+
+
+---
+
+
