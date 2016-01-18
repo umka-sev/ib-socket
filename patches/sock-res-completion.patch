@@ -1,0 +1,15 @@
+Bottom: 6277ae55349fe63894717a51ca838498bf6e04b7
+Top:    6277ae55349fe63894717a51ca838498bf6e04b7
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-18 11:04:01 +0300
+
+second part resources for an socket.
+it's QP / CQ related code.
+
+CQ - is transmission notification events queue
+QP - is some structure related to the control transmissions at all.
+
+
+---
+
+
