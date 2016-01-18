@@ -113,7 +113,7 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 		ret = rdma_accept(sock->is_id, &conn_param);
 		if (ret < 0) {
 			/* will destroy after exit from event cb */
-			sock->is_id == NULL;
+			sock->is_id = NULL;
 			ib_socket_destroy(sock);
 			return ret;
 		}
