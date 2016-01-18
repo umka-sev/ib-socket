@@ -1,11 +1,11 @@
 Version: 1
-Previous: 3926a7cebd4156e4b389529e8056a7b0d843879a
-Head: 2ac0e1601b7839e9e62aa94beee5b28ae2277454
+Previous: ef115f05e48ceabf033ab6eb4f6f99374d9bc067
+Head: 4353fff50858161303b2431766fee040c0c71340
 Applied:
   ib-sock-into.patch: c21ffebdf559a968b576abe5b2fa07716e4ff72d
   cli.patch: 3f772a0dbde1ff0bd98c6af68c128ddeda6fbfdd
   srv.patch: 4353fff50858161303b2431766fee040c0c71340
-  sock-res-mem.patch: 2ac0e1601b7839e9e62aa94beee5b28ae2277454
 Unapplied:
+  sock-res-mem.patch: 2ac0e1601b7839e9e62aa94beee5b28ae2277454
   sock-res-completion.patch: ca0c73f9af98b8254d62a70b73b304959f58f6ac
 Hidden:
