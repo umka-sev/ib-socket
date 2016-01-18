@@ -1,5 +1,5 @@
 Bottom: 7411129e6c92aae16c859c12b7fd9fd8999a12c3
-Top:    6211092ebf504eb3de35d1aa2382279109f06fd4
+Top:    52f54a9066c43779ebf2ff7fe6e106660e78d754
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-15 12:45:24 +0300
 
@@ -50,7 +50,7 @@ index add0b53..d2a1904 100644
  	unsigned long		is_events;
  	wait_queue_head_t	is_events_wait;
 diff --git a/ib-sock.c b/ib-sock.c
-index fa47955..c79a279 100644
+index fa47955..5abf9a5 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
 @@ -1,6 +1,9 @@
@@ -63,7 +63,7 @@ index fa47955..c79a279 100644
  static int
  cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  {
-@@ -67,6 +70,69 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -67,6 +70,71 @@ cm_client_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  	printk("client CM event ret %d\n", ret);
  	return ret;
  }
@@ -119,6 +119,8 @@ index fa47955..c79a279 100644
 +		list_add(&sock->is_child, &parent->is_child);
 +		spin_unlock(&parent->is_child_lock);
 +
++		sock_event_set(parent, POLLIN);
++
 +		break;
 +	}
 +	default:
@@ -133,7 +135,7 @@ index fa47955..c79a279 100644
  
  
  static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
-@@ -88,6 +154,12 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -88,6 +156,12 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  		break;
  	/* server related events */
  	case RDMA_CM_EVENT_CONNECT_REQUEST:
@@ -146,7 +148,7 @@ index fa47955..c79a279 100644
  		break;
  	/* some common errors */
  	case RDMA_CM_EVENT_ADDR_ERROR:
-@@ -98,6 +170,8 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -98,6 +172,8 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  	case RDMA_CM_EVENT_CONNECT_ERROR:
  	case RDMA_CM_EVENT_REJECTED:
  		/* to decode a reject event, see srp_cm_rej_handler */
@@ -155,7 +157,7 @@ index fa47955..c79a279 100644
  		ret = -ECONNREFUSED;
  		break;
  	/* some hard errors to abort connection */
-@@ -121,7 +195,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
+@@ -121,7 +197,7 @@ static int cm_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
  	return 0;
  }
  
@@ -164,7 +166,7 @@ index fa47955..c79a279 100644
  {
  	struct IB_SOCK *sock;
  
-@@ -129,23 +203,37 @@ struct IB_SOCK *ib_socket_create()
+@@ -129,23 +205,37 @@ struct IB_SOCK *ib_socket_create()
  	if (sock == NULL)
  		return NULL;
  
@@ -212,7 +214,7 @@ index fa47955..c79a279 100644
  }
  
  void ib_socket_destroy(struct IB_SOCK *sock)
-@@ -201,7 +289,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
+@@ -201,7 +291,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
  		printk("Failed to disconnect, conn: 0x%p err %d\n",
  			 sock,err);
  }
@@ -221,7 +223,7 @@ index fa47955..c79a279 100644
  static unsigned long __take_event(struct IB_SOCK *sock, unsigned long *e)
  {
  	unsigned long events;
-@@ -224,3 +312,46 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
+@@ -224,3 +314,47 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
  
  	return mask;
  }
@@ -266,6 +268,7 @@ index fa47955..c79a279 100644
 +		list_del_init(&sock->is_child);
 +	}
 +	spin_unlock(&parent->is_child_lock);
++	printk("Accept returned %p\n", sock);
 +	return sock;
 +}
 diff --git a/ib-sock.h b/ib-sock.h
@@ -283,10 +286,10 @@ index 533e991..0a2f9a9 100644
  #endif
 \ No newline at end of file
 diff --git a/srv.c b/srv.c
-index 801b561..e09d9d1 100644
+index 801b561..6f350e9 100644
 --- a/srv.c
 +++ b/srv.c
-@@ -1,14 +1,41 @@
+@@ -1,14 +1,42 @@
  #include "ib-sock.h"
  
 +
@@ -296,7 +299,7 @@ index 801b561..e09d9d1 100644
  {
 -	struct IB_SOCK *sock;
 +	struct IB_SOCK *sock, *sock_child = NULL;
-+	unsigned long event;
++	unsigned long event = 0;
 +	int ret;
  
  	sock = ib_socket_create();
@@ -309,7 +312,8 @@ index 801b561..e09d9d1 100644
 +
 +	/* wait incomming connect */
 +	while ((event & POLLIN) == 0) {
-+	event = ib_socket_poll(sock);
++		event = ib_socket_poll(sock);
++		printk("srv got event %lx\n", event);
 +		/* wait a POLLIN to say new connection ready to */
 +		if ((event & POLLERR) != 0)
 +			goto out;
