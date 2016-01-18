@@ -44,6 +44,15 @@ int ib_sock_mem_init(struct IB_SOCK *sock)
 	if (ret < 0)
 		return ret;
 
+	/* just for now, we reserve resources for control messages.
+	 * it's needs a 1 WR and one segment inside.
+	 */
+	sock->is_mem.ism_wr_count = 1;
+	sock->is_mem.ism_sge_count = 1;
+
+	sock->is_mem.ism_wr_count *= IB_MAX_PARALLEL;
+	sock->is_mem.ism_sge_count *= IB_MAX_PARALLEL;
+
 	/* different memory managment models may need different init */
 
 	return 0;
