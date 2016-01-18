@@ -124,7 +124,7 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 		}
 
 		sock = __ib_socket_create(cmid);
-		if (sock != NULL) {
+		if (sock == NULL) {
 			printk("error accept \n");
 			ret = -ENOMEM;
 			break;
@@ -155,6 +155,8 @@ cm_server_handler(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
 		spin_lock(&parent->is_child_lock);
 		list_add(&sock->is_child, &parent->is_child);
 		spin_unlock(&parent->is_child_lock);
+
+		sock_event_set(parent, POLLIN);
 
 		break;
 	}
@@ -274,6 +276,8 @@ void ib_socket_destroy(struct IB_SOCK *sock)
 {
 	printk("IB socket destroy %p\n", sock);
 
+	ib_sock_resource_free(sock);
+
 	if (sock->is_id)
 		rdma_destroy_id(sock->is_id);
 	kfree(sock);
@@ -387,5 +391,6 @@ struct IB_SOCK *ib_socket_accept(struct IB_SOCK *parent)
 		list_del_init(&sock->is_child);
 	}
 	spin_unlock(&parent->is_child_lock);
+	printk("Accept returned %p\n", sock);
 	return sock;
 }
