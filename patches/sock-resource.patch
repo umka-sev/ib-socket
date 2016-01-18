@@ -1,5 +1,5 @@
 Bottom: 52f54a9066c43779ebf2ff7fe6e106660e78d754
-Top:    2976fa73133e0a1bc27b2680b0772a8ac0bd13b2
+Top:    6277ae55349fe63894717a51ca838498bf6e04b7
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-16 21:11:03 +0300
 
@@ -35,7 +35,7 @@ index 590400a..313194f 100644
      netcli-objs	:= cli.o $(obj_ib-y)
  else
 diff --git a/ib-sock-int.h b/ib-sock-int.h
-index d2a1904..4e9988d 100644
+index d2a1904..9d4cd30 100644
 --- a/ib-sock-int.h
 +++ b/ib-sock-int.h
 @@ -7,6 +7,8 @@
@@ -47,7 +47,7 @@ index d2a1904..4e9988d 100644
  #define IB_ADDR_TIMEOUT 100
  #define IB_ROUTE_TIMEOUT 100
  
-@@ -17,12 +19,27 @@ enum ib_sock_flags {
+@@ -17,12 +19,22 @@ enum ib_sock_flags {
  	SOCK_ERROR	= 1 << 1,
  };
  
@@ -57,11 +57,6 @@ index d2a1904..4e9988d 100644
 +	/* memory window to map.
 +	 * all ? or most cards may work with single == global MR  */
 +	struct ib_mr		*ism_mr;
-+	
-+	/* # send work items for single transfer */
-+	unsigned		ism_wr_count;
-+	/* ...and their memory */
-+	unsigned		ism_sge_count;
 +};
 +
  struct IB_SOCK {
@@ -75,7 +70,7 @@ index d2a1904..4e9988d 100644
  	/* pre-accepted sockets */
  	spinlock_t		is_child_lock;
  	struct list_head	is_child;
-@@ -39,7 +56,6 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
+@@ -39,7 +51,6 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
  	wake_up(&sock->is_events_wait);
  }
  
@@ -83,7 +78,7 @@ index d2a1904..4e9988d 100644
  /* messages on wire */
  #define WIRE_ATTR	__attribute__((packed))
  
-@@ -50,6 +66,11 @@ struct ib_hello {
+@@ -50,6 +61,11 @@ struct ib_hello {
  } WIRE_ATTR;
  
  
