@@ -25,11 +25,6 @@ struct ib_sock_mem {
 	/* memory window to map.
 	 * all ? or most cards may work with single == global MR  */
 	struct ib_mr		*ism_mr;
-	
-	/* # send work items for single transfer */
-	unsigned		ism_wr_count;
-	/* ...and their memory */
-	unsigned		ism_sge_count;
 };
 
 struct IB_SOCK {
