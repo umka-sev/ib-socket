@@ -1,5 +1,5 @@
-Bottom: 6211092ebf504eb3de35d1aa2382279109f06fd4
-Top:    e3b7c717a8f83cb60aa48371ea8ef9b147d6a5a6
+Bottom: 52f54a9066c43779ebf2ff7fe6e106660e78d754
+Top:    2976fa73133e0a1bc27b2680b0772a8ac0bd13b2
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-16 21:11:03 +0300
 
@@ -157,7 +157,7 @@ index 0000000..4976a3f
 +	ib_sock_mem_fini_common(sock);
 +}
 diff --git a/ib-sock.c b/ib-sock.c
-index c79a279..9bbb379 100644
+index 5abf9a5..7367020 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
 @@ -1,8 +1,26 @@
@@ -245,7 +245,7 @@ index c79a279..9bbb379 100644
  			return ret;
  		}
  
-@@ -240,6 +274,8 @@ void ib_socket_destroy(struct IB_SOCK *sock)
+@@ -242,6 +276,8 @@ void ib_socket_destroy(struct IB_SOCK *sock)
  {
  	printk("IB socket destroy %p\n", sock);
  
