@@ -1,0 +1,28 @@
+Bottom: 599aa3d7b298b76d67c73ec1d45cbd6fbb325324
+Top:    6211092ebf504eb3de35d1aa2382279109f06fd4
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-18 07:52:04 +0300
+
+Refresh of srv.patch
+
+---
+
+diff --git a/srv.c b/srv.c
+index feb9c9b..e09d9d1 100644
+--- a/srv.c
++++ b/srv.c
+@@ -27,12 +27,13 @@ srv_init(void)
+ 	/* have incomming event, so socket is ready */
+ 	sock_child = ib_socket_accept(sock);
+ 	BUG_ON(sock_child == NULL);
+-
++#if 0
+ 	while ( 1 ) {
+ 		event = ib_socket_poll(sock_child);
+ 		if (event & POLLERR)
+ 			break;
+ 	}
++#endif
+ 	ib_socket_destroy(sock_child);
+ out:
+ 	ib_socket_destroy(sock);
