@@ -3,8 +3,91 @@
 
 static struct IB_SOCK *__ib_socket_create(struct rdma_cm_id *cm_id);
 
+static void qp_event_callback(struct ib_event *cause, void *context)
+{
+	printk("got qp event %d\n",cause->event);
+}
+
+static void ib_cq_event_callback(struct ib_event *cause, void *context)
+{
+	printk("got cq event %d \n", cause->event);
+}
+
+
+/* have some change states  */
+/* DID we really needs it ? */
+static void ib_cq_callback(struct ib_cq *cq, void *cq_context)
+{
+	struct IB_SOCK *sock = cq_context;
+
+	printk("cq event %p\n", sock);
+}
+
+/* creation of CQ/QP isn't needs to create on route event,
+ * but it must done before rdma_connect */
+static int ib_sock_cq_qp_create(struct IB_SOCK *sock)
+{
+	struct rdma_cm_id	*cmid = sock->is_id;
+	struct ib_qp_init_attr	init_attr;
+	int    ret;
+
+	/* event queue */
+	sock->is_cq = ib_create_cq(cmid->device,
+				   ib_cq_callback,
+				   ib_cq_event_callback,
+				   (void *)&sock, /* context */
+				   IB_CQ_EVENTS_MAX, /* max events in queue 
+						     * typically max parallel ops */
+				   0);
+	if (IS_ERR(sock->is_cq)) {
+		ret = PTR_ERR(sock->is_cq);
+		sock->is_cq = NULL;
+		printk("error create cq %d\n", ret);
+		return ret;
+	}
+
+	/* XXX need check a ret code ? */
+	ib_req_notify_cq(sock->is_cq, IB_CQ_NEXT_COMP);
+
+	/* data queue */
+	memset(&init_attr, 0, sizeof(init_attr));
+	init_attr.event_handler = qp_event_callback;
+	init_attr.qp_context	= (void *)&sock;
+	init_attr.send_cq	= sock->is_cq;
+	init_attr.recv_cq	= sock->is_cq;
+	init_attr.sq_sig_type	= IB_SIGNAL_REQ_WR;
+	init_attr.qp_type	= IB_QPT_RC;
+
+	init_attr.cap.max_send_wr = sock->is_mem.ism_wr_count;
+	init_attr.cap.max_recv_wr = sock->is_mem.ism_wr_count;
+
+	init_attr.cap.max_send_sge = sock->is_mem.ism_sge_count;
+	init_attr.cap.max_recv_sge = sock->is_mem.ism_sge_count;
+
+	ret = rdma_create_qp(cmid, sock->is_mem.ism_pd, &init_attr);
+	if (ret != 0) {
+		printk("error create qp %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static void ib_sock_cq_qp_destroy(struct IB_SOCK *sock)
+{
+	struct rdma_cm_id *cmid = sock->is_id;
+
+	/* XXX is it needs ? */
+	if (cmid != NULL && cmid->qp != NULL)
+		rdma_destroy_qp(cmid);
+
+	if (sock->is_cq != NULL)
+		ib_destroy_cq(sock->is_cq);
+}
+
 /* allocate a sort of resources for socket, such as 
  * 1) memory region to map a requests
+ * 2) CQ/QP pair to handle events about transmssion data
  */
 static int ib_sock_resource_alloc(struct IB_SOCK *sock)
 {
@@ -14,11 +97,16 @@ static int ib_sock_resource_alloc(struct IB_SOCK *sock)
 	if (ret < 0)
 		return ret;
 
+	ret = ib_sock_cq_qp_create(sock);
+	if (ret < 0)
+		return ret;
+
 	return 0;
 }
 
 static void ib_sock_resource_free(struct IB_SOCK *sock)
 {
+	ib_sock_cq_qp_destroy(sock);
 	ib_sock_mem_fini(sock);
 }
 
@@ -241,6 +329,8 @@ struct IB_SOCK *__ib_socket_create(struct rdma_cm_id *cm_id)
 
 	sock->is_id = cm_id;
 	cm_id->context = sock;
+
+	sock->is_cq = NULL;
 
 	sock->is_flags = 0;
 
