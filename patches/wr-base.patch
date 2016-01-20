@@ -1,0 +1,15 @@
+Bottom: e8cc222994a5c259ce93dc5f887e9f3f5a4dee22
+Top:    e8cc222994a5c259ce93dc5f887e9f3f5a4dee22
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-20 09:06:46 +0300
+
+WR is base IB object. 
+it's some operations executed on IB card, such as
+send / recv over wire, map some area to transfer key,
+and other.
+Add some base infrastructure for it.
+
+
+---
+
+
