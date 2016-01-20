@@ -1,5 +1,5 @@
 Bottom: 7411129e6c92aae16c859c12b7fd9fd8999a12c3
-Top:    52f54a9066c43779ebf2ff7fe6e106660e78d754
+Top:    2a7eacc1e6c09814fbee6b15d25e417561dd2ff4
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-15 12:45:24 +0300
 
@@ -50,7 +50,7 @@ index add0b53..d2a1904 100644
  	unsigned long		is_events;
  	wait_queue_head_t	is_events_wait;
 diff --git a/ib-sock.c b/ib-sock.c
-index fa47955..5abf9a5 100644
+index fa47955..1816baa 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
 @@ -1,6 +1,9 @@
@@ -166,7 +166,7 @@ index fa47955..5abf9a5 100644
  {
  	struct IB_SOCK *sock;
  
-@@ -129,23 +205,37 @@ struct IB_SOCK *ib_socket_create()
+@@ -129,29 +205,52 @@ struct IB_SOCK *ib_socket_create()
  	if (sock == NULL)
  		return NULL;
  
@@ -214,7 +214,22 @@ index fa47955..5abf9a5 100644
  }
  
  void ib_socket_destroy(struct IB_SOCK *sock)
-@@ -201,7 +291,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
+ {
++	struct IB_SOCK *pos, *next;
++
+ 	printk("IB socket destroy %p\n", sock);
+ 
++	sock->is_flags |= SOCK_ERROR;
++
++	list_for_each_entry_safe(pos, next, &sock->is_child, is_child) {
++		list_del(&pos->is_child);
++		ib_socket_destroy(pos);
++	}
++
+ 	if (sock->is_id)
+ 		rdma_destroy_id(sock->is_id);
+ 	kfree(sock);
+@@ -201,7 +300,7 @@ void ib_socket_disconnect(struct IB_SOCK *sock)
  		printk("Failed to disconnect, conn: 0x%p err %d\n",
  			 sock,err);
  }
@@ -223,7 +238,7 @@ index fa47955..5abf9a5 100644
  static unsigned long __take_event(struct IB_SOCK *sock, unsigned long *e)
  {
  	unsigned long events;
-@@ -224,3 +314,47 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
+@@ -224,3 +323,47 @@ unsigned long ib_socket_poll(struct IB_SOCK *sock)
  
  	return mask;
  }
