@@ -1,6 +1,7 @@
 ifneq ($(KERNELRELEASE),)
     obj-m	:= netsrv.o netcli.o
     obj_ib-y	:= ib-sock.o ib-sock-util.o
+    obj_ib-y	+= ib-sock-mem.o
     netsrv-objs	:= srv.o $(obj_ib-y)
     netcli-objs	:= cli.o $(obj_ib-y)
 else
