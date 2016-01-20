@@ -1,5 +1,5 @@
 Bottom: e8cc222994a5c259ce93dc5f887e9f3f5a4dee22
-Top:    eb9a53c3632e380a0c544fae34cecf36cb4aa8eb
+Top:    638cb1b3c2ab4fce7bc13732127b4b89658470d1
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-20 09:06:46 +0300
 
@@ -12,6 +12,19 @@ Add some base infrastructure for it.
 
 ---
 
+diff --git a/Makefile b/Makefile
+index 08d99d2..53c3603 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ ifneq ($(KERNELRELEASE),)
+     obj-m	:= netsrv.o netcli.o
+     obj_ib-y	:= ib-sock.o ib-sock-util.o
+-    obj_ib-y	+= ib-sock-mem.o ib-sock-ctl.o
++    obj_ib-y	+= ib-sock-mem.o ib-sock-ctl.o ib-sock-wr.o
+     netsrv-objs	:= srv.o $(obj_ib-y)
+     netcli-objs	:= cli.o $(obj_ib-y)
+ else
 diff --git a/ib-sock-ctl.c b/ib-sock-ctl.c
 index 9441486..324b505 100644
 --- a/ib-sock-ctl.c
