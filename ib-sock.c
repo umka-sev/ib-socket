@@ -240,7 +240,16 @@ struct IB_SOCK *ib_socket_create()
 
 void ib_socket_destroy(struct IB_SOCK *sock)
 {
+	struct IB_SOCK *pos, *next;
+
 	printk("IB socket destroy %p\n", sock);
+
+	sock->is_flags |= SOCK_ERROR;
+
+	list_for_each_entry_safe(pos, next, &sock->is_child, is_child) {
+		list_del(&pos->is_child);
+		ib_socket_destroy(pos);
+	}
 
 	if (sock->is_id)
 		rdma_destroy_id(sock->is_id);
