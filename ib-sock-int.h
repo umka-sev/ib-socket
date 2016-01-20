@@ -76,6 +76,30 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
 	wake_up(&sock->is_events_wait);
 }
 
+/* IB card operation. it's chain of WR's with own
+ * sge */
+/* differences between read and write operation 
+ * just an IB wr opcode, and one WR at begin to transfer 
+ * a transfer descriptor.
+ * it message may replaced with MAD packet, but i don't find how
+ * to do it.
+ */
+struct ib_sock_wr {
+	struct list_head	isw_link;
+
+	/* possition in WR array to use */
+	unsigned		isw_wr_pos;
+	/* preallocated send work items.. in ring.
+	 * did we need a static allocation ?
+	 */
+	struct ib_send_wr	*isw_wrq;
+
+	/* ...and their memory */
+	unsigned		isw_sge_pos;
+	struct ib_sge		*isw_sge;
+};
+
+
 /**************************** messages on wire ********************/
 #define WIRE_ATTR	__attribute__((packed))
 
@@ -101,7 +125,15 @@ struct ib_sock_ctl {
 	 * must be first WR in sending chain */
 	struct ib_sock_wire_msg	iscm_msg;
 };
-/************* ib sock control protocol ***************************/
+/************* ib sock control protocol end ************************/
+
+
+/* wr.c */
+struct ib_sock_wr *wr_idle_get(struct IB_SOCK *sock);
+void wr_put(struct IB_SOCK *sock, struct ib_sock_wr *wr);
+int wr_init(struct IB_SOCK *sock);
+void wr_fini(struct IB_SOCK *sock);
+
 /* ctl-msg.c */
 /* init queue and post sort of rx buffer to wait incomming data */
 int ib_sock_ctl_msg_init(struct IB_SOCK *sock);
