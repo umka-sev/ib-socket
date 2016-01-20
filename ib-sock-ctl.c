@@ -37,6 +37,7 @@ void ib_sock_ctl_put(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
 	list_add(&msg->iscm_link, &sock->is_ctl_idle_list);
 	wake_up(&sock->is_ctl_waitq);
 }
+
 struct kmem_cache *ib_sock_ctl;
 
 int ib_sock_ctl_init(struct IB_SOCK *sock)
@@ -65,13 +66,24 @@ int ib_sock_ctl_init(struct IB_SOCK *sock)
 		if (msg == NULL)
 			continue;
 		count ++;
-		/* pre init */
-
+		/* pre init and put to idle */
+		ib_sock_ctl_put(msg);
 	}
 	return 0;
 }
 
 void ib_sock_ctl_fini(struct IB_SOCK *sock)
 {
-	
+	struct ib_sock_ctl *pos, *next;
+
+	/* i don't know how an abort active controls for now */
+	BUG_ON(!list_empty(&sock->is_ctl_active_list));
+
+	list_for_each_entry_safe(pos, next, &sock->is_ctl_active_list,
+				 iscm_link) {
+		list_del(&pos->iscm_link);
+
+		kmem_cache_free(ib_sock_ctl, pos);
+	}
+
 }
