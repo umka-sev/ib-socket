@@ -1,6 +1,6 @@
 Version: 1
-Previous: 1750d0246f7f02c9117abc13407fb55604e70ac0
-Head: b3f00f95c6091bfb45e84196891cfcd7a9e4ecee
+Previous: 61a6cc34b848b7d950ced9220251b7693ebc6257
+Head: 6019c9becd2500cbf3ddd77a136c9c5a99a9c4b8
 Applied:
   ib-sock-into.patch: c21ffebdf559a968b576abe5b2fa07716e4ff72d
   cli.patch: 3f772a0dbde1ff0bd98c6af68c128ddeda6fbfdd
@@ -8,7 +8,7 @@ Applied:
   sock-res-mem.patch: c6ec9bf29cb27aa41a7a5115b62a6746d5c084b0
   sock-res-completion.patch: dddd9d96990d0da9bd513b2a930e315caa79b132
   control-msg.patch: b3f00f95c6091bfb45e84196891cfcd7a9e4ecee
+  ctl-verbs.patch: 6019c9becd2500cbf3ddd77a136c9c5a99a9c4b8
 Unapplied:
-  ctl-verbs.patch: a6aa2814f58970d7bae509074db907668015850b
   wr-base.patch: 21e14f98057a58fd2d71736f04ea850b9ae320ff
 Hidden:
