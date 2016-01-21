@@ -38,6 +38,14 @@ cli_init(void)
 	}
 	event = ib_socket_poll(sock);
 	printk("Event hit %lx\n", event);
+	if (event & POLLOUT) {
+		err = ib_socket_write(sock, srv_addr, strlen(srv_addr));
+		printk("status send %d\n", err);
+	}
+	/* next event when transfer is done */
+	printk("Event hit %lx\n", event);
+	event = ib_socket_poll(sock);
+
 
 	ib_socket_disconnect(sock);
 exit:

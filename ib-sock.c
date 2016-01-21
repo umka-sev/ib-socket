@@ -13,6 +13,83 @@ static void ib_cq_event_callback(struct ib_event *cause, void *context)
 	printk("got cq event %d \n", cause->event);
 }
 
+static void ib_sock_handle_rx(struct IB_SOCK *sock, struct ib_wc *wc)
+{
+	struct ib_sock_ctl *msg = (struct ib_sock_ctl *)(uintptr_t)wc->wr_id;
+	struct ib_device *device = sock->is_id->device;
+	int ret;
+
+	/* CPU is owner*/
+	ib_dma_sync_single_for_cpu(device, 
+				   msg->iscm_sge.addr, msg->iscm_sge.length,
+				   DMA_FROM_DEVICE);
+
+	if (wc->status != IB_WC_SUCCESS) {
+		printk("rx status error %d\n", wc->status);
+		goto repost;
+	}
+
+
+	if (msg->iscm_msg.sww_magic != IB_CTL_MSG_MAGIC) {
+		printk("recv magic bad %x\n", msg->iscm_msg.sww_magic);
+		goto repost;
+	}
+
+	/* do processing there */
+	printk("recv maic ok!\n");
+	spin_lock(&sock->is_ctl_lock);
+	list_move(&msg->iscm_link, &sock->is_ctl_rd_list);
+	spin_lock(&sock->is_ctl_lock);
+
+	/* ready for userland */
+	sock_event_set(sock, POLLIN);
+repost:
+	/* repost to processing */
+	ret  = ib_sock_ctl_post(sock, msg);
+	if (ret != 0) 
+		/* probably we need a chanse to report it later ? */
+		printk("Error with summit to rx queue\n");
+}
+
+static void ib_sock_handle_tx(struct IB_SOCK *sock, struct ib_wc *wc)
+{
+	int event = POLLOUT;
+	/* TX event hit when TX done or error hit */
+
+	if (wc->status != IB_WC_SUCCESS)
+		event |= POLLERR;
+	sock_event_set(sock, event);
+}
+
+/* based on ip over ib code  */
+static void ib_sock_cq_work(struct work_struct *work)
+{
+	struct IB_SOCK *sock;
+	int n, i;
+	struct ib_sock_ctl *msg;
+
+	sock = container_of(work, struct IB_SOCK, is_cq_work);
+
+poll_more:
+	n = ib_poll_cq(sock->is_cq, IB_CQ_EVENTS_BATCH, sock->is_cq_wc);
+	for (i = 0; i < n; i++) {
+		msg = (struct ib_sock_ctl *)(uintptr_t)sock->is_cq_wc[i].wr_id;
+		if (msg->iscm_flags & CTL_MSG_RX)
+			ib_sock_handle_rx(sock, &sock->is_cq_wc[i]);
+		else
+			ib_sock_handle_tx(sock, &sock->is_cq_wc[i]);
+
+	}
+
+	/* abstract limit */
+	if (n < (IB_CQ_EVENTS_BATCH / 2)) {
+		if (unlikely(ib_req_notify_cq(sock->is_cq,
+					      IB_CQ_NEXT_COMP |
+					      IB_CQ_REPORT_MISSED_EVENTS)))
+			goto poll_more;
+	}
+
+}
 
 /* have some change states  */
 /* DID we really needs it ? */
@@ -21,6 +98,7 @@ static void ib_cq_callback(struct ib_cq *cq, void *cq_context)
 	struct IB_SOCK *sock = cq_context;
 
 	printk("cq event %p\n", sock);
+	schedule_work(&sock->is_cq_work);
 }
 
 /* creation of CQ/QP isn't needs to create on route event,
@@ -31,7 +109,10 @@ static int ib_sock_cq_qp_create(struct IB_SOCK *sock)
 	struct ib_qp_init_attr	init_attr;
 	int    ret;
 
-	/* event queue */
+	/* XXX need special refactoring to extract per device data */
+	INIT_WORK(&sock->is_cq_work, ib_sock_cq_work);
+
+	/* event queue, may per CPU and per device, not per socket */
 	sock->is_cq = ib_create_cq(cmid->device,
 				   ib_cq_callback,
 				   ib_cq_event_callback,
@@ -77,6 +158,8 @@ static void ib_sock_cq_qp_destroy(struct IB_SOCK *sock)
 {
 	struct rdma_cm_id *cmid = sock->is_id;
 
+	flush_scheduled_work();
+
 	/* XXX is it needs ? */
 	if (cmid != NULL && cmid->qp != NULL)
 		rdma_destroy_qp(cmid);
@@ -101,6 +184,10 @@ static int ib_sock_resource_alloc(struct IB_SOCK *sock)
 	if (ret < 0)
 		return ret;
 
+	ret = ib_sock_ctl_init(sock);
+	if (ret < 0)
+		return ret;
+
 	return 0;
 }
 
@@ -108,6 +195,7 @@ static void ib_sock_resource_free(struct IB_SOCK *sock)
 {
 	ib_sock_cq_qp_destroy(sock);
 	ib_sock_mem_fini(sock);
+	ib_sock_ctl_fini(sock);
 }
 
 static int
@@ -493,3 +581,67 @@ struct IB_SOCK *ib_socket_accept(struct IB_SOCK *parent)
 	printk("Accept returned %p\n", sock);
 	return sock;
 }
+/*****************************************************************************************/
+/* return a size of transfer */
+size_t ib_socket_read_size(struct IB_SOCK *sock)
+{
+	struct ib_sock_ctl *msg;
+	int ret = -EAGAIN;
+
+	/* as we have a single parallel transfer - 
+	 * just enough to check a first element in list */
+	spin_lock(&sock->is_ctl_lock);
+	msg = list_first_entry_or_null(&sock->is_ctl_rd_list,
+				       struct ib_sock_ctl, iscm_link);
+	if (msg != NULL)
+		ret = msg->iscm_msg.sww_size;
+	spin_unlock(&sock->is_ctl_lock);
+
+	return ret;
+}
+
+/* process contol msg and repost */
+int ib_socket_read(struct IB_SOCK *sock, void *buf, size_t size)
+{
+	struct ib_sock_ctl *msg;
+
+	/* as we have a single parallel transfer - 
+	 * just enough to check a first element in list */
+	spin_lock(&sock->is_ctl_lock);
+	msg = list_first_entry_or_null(&sock->is_ctl_rd_list,
+				       struct ib_sock_ctl, iscm_link);
+	if (msg != NULL)
+		list_del(&msg->iscm_link);
+	spin_unlock(&sock->is_ctl_lock);
+	if (msg == NULL)
+		return -EAGAIN;
+
+	return ib_sock_ctl_post(sock, msg);
+}
+
+/* send some amount data over wire */
+int ib_socket_write(struct IB_SOCK *sock, void *buf, size_t size)
+{
+	/* stub. send an CTL msg only */
+	struct ib_sock_ctl *msg;
+	struct ib_send_wr wr = {
+		.opcode = IB_WR_SEND,
+	};
+	struct ib_send_wr *bad;
+	int ret = -EINVAL;
+
+	msg = ib_sock_ctl_take(sock);
+
+	wr.next = NULL;
+	wr.wr_id = (uintptr_t)msg;
+	wr.sg_list = &msg->iscm_sge;
+	wr.num_sge = 1;
+
+	ret = ib_post_send(sock->is_qp, &wr, &bad);
+	/* if OK - will returned in idle list in the callback */
+	if (ret != 0)
+		ib_sock_ctl_put(sock, msg);
+
+	return ret;
+}
+
