@@ -50,6 +50,8 @@ struct IB_SOCK {
 	/* completion events */
 	struct ib_cq		*is_cq;
 	/* queue pair to communicate between nodes */
+	/* we may create a per CPU QP to reduce a contention
+	 * on single QP */
 	struct ib_qp		*is_qp;
 
 	/* pre-accepted sockets */
