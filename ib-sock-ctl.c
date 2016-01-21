@@ -47,8 +47,9 @@ int ib_sock_ctl_post(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
 	 */
 	struct ib_recv_wr wr;
 	struct ib_recv_wr *bad_wr;
+	int ret;
 
-	ret = ib_post_recv(rx->qp, &wr, &bad_wr);
+	ret = ib_post_recv(sock->is_qp, &wr, &bad_wr);
 
 	return 0;
 }
