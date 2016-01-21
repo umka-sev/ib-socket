@@ -85,23 +85,28 @@ struct ib_hello {
 	__u32	magic;
 } WIRE_ATTR;
 
-/************* ib sock control protocol ***************************/
 #define IB_CTL_MSG_MAGIC	0x87154
 
 struct ib_sock_wire_msg {
 	uint32_t	sww_magic;
 } WIRE_ATTR;
 
+/**************************** messages on wire ********************/
+
+/************* ib sock control protocol ***************************/
+
 struct ib_sock_ctl {
 	struct list_head	iscm_link;
 
+	/* per MAD code we don't need sge at memory, but
+	 * we need a dma address instead. Lets do it optimization
+	 * later */
 	struct ib_sge		iscm_sge;
 
 	/* used to describe an incomming rdma transfer,
 	 * must be first WR in sending chain */
 	struct ib_sock_wire_msg	iscm_msg;
 };
-/************* ib sock control protocol ***************************/
 /* ctl-msg.c */
 /* init queue and post sort of rx buffer to wait incomming data */
 int ib_sock_ctl_msg_init(struct IB_SOCK *sock);
