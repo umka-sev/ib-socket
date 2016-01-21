@@ -1,5 +1,5 @@
-Bottom: ccc0c810e2395e501642fd53f9432ea1045cac64
-Top:    81e2fda531d9b691d4d1f5927e5d89a4c57de8b6
+Bottom: 20217f47dc32b54ca1aa7c130e025e9bb07a0ff3
+Top:    fd856c0ce4f708032ba5a33272d759bbd390e2bd
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-18 21:42:27 +0300
 
@@ -134,7 +134,7 @@ index 0000000..4f35dcd
 +	}
 +}
 diff --git a/ib-sock-int.h b/ib-sock-int.h
-index c6bcecf..b87c488 100644
+index 08df596..f1818d8 100644
 --- a/ib-sock-int.h
 +++ b/ib-sock-int.h
 @@ -16,7 +16,8 @@
@@ -147,8 +147,8 @@ index c6bcecf..b87c488 100644
  
  enum ib_sock_flags {
  	SOCK_CONNECTED	= 1 << 0,
-@@ -52,6 +53,13 @@ struct IB_SOCK {
- 	/* queue pair to communicate between nodes */
+@@ -54,6 +55,13 @@ struct IB_SOCK {
+ 	 * on single QP */
  	struct ib_qp		*is_qp;
  
 +	/* control messages */
@@ -161,7 +161,7 @@ index c6bcecf..b87c488 100644
  	/* pre-accepted sockets */
  	spinlock_t		is_child_lock;
  	struct list_head	is_child;
-@@ -68,7 +76,7 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
+@@ -70,7 +78,7 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
  	wake_up(&sock->is_events_wait);
  }
  
@@ -170,7 +170,7 @@ index c6bcecf..b87c488 100644
  #define WIRE_ATTR	__attribute__((packed))
  
  #define IB_HELLO_MAGIC 0x9012
-@@ -77,6 +85,34 @@ struct ib_hello {
+@@ -79,6 +87,34 @@ struct ib_hello {
  	__u32	magic;
  } WIRE_ATTR;
  
