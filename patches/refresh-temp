@@ -1,0 +1,24 @@
+Bottom: c5ba1d05b50a037c1cf5a27401d0276cca95fc3c
+Top:    81e2fda531d9b691d4d1f5927e5d89a4c57de8b6
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-21 10:46:12 +0300
+
+Refresh of control-msg.patch
+
+---
+
+diff --git a/ib-sock-ctl.c b/ib-sock-ctl.c
+index 3518a17..4f35dcd 100644
+--- a/ib-sock-ctl.c
++++ b/ib-sock-ctl.c
+@@ -90,6 +90,10 @@ void ib_sock_ctl_fini(struct IB_SOCK *sock)
+ 	struct ib_sock_ctl *pos, *next;
+ 
+ 	/* XXX flush active */
++	list_for_each_entry_safe(pos, next, &sock->is_ctl_active_list, iscm_link) {
++		list_del(&pos->iscm_link);
++		list_add(&pos->iscm_link, &sock->is_ctl_idle_list);
++	}
+ 
+ 	list_for_each_entry_safe(pos, next, &sock->is_ctl_idle_list, iscm_link) {
+ 		list_del(&pos->iscm_link);
