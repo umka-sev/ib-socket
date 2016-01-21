@@ -49,9 +49,14 @@ int ib_sock_ctl_post(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
 	struct ib_recv_wr *bad_wr;
 	int ret;
 
+	wr.next = NULL;
+//	wr.wr_id = id | SDP_OP_RECV;
+	wr.sg_list = &msg->iscm_sge;
+	wr.num_sge = 1;
+
 	ret = ib_post_recv(sock->is_qp, &wr, &bad_wr);
 
-	return 0;
+	return ret;
 }
  
 void ib_sock_ctl_put(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
@@ -61,6 +66,33 @@ void ib_sock_ctl_put(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
 	spin_unlock(&sock->is_ctl_lock);
 
 	wake_up(&sock->is_ctl_waitq);
+}
+
+static int 
+ctl_msg_init(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
+{
+	struct ib_device *device = sock->is_id->device;
+	unsigned long dma_addr;
+
+	dma_addr = ib_dma_map_single(device, (void *)&msg->iscm_msg,
+				sizeof(msg->iscm_msg), DMA_FROM_DEVICE);
+	if (ib_dma_mapping_error(device, dma_addr))
+		return -EIO;
+
+	msg->iscm_sge.addr = dma_addr;
+	msg->iscm_sge.length = sizeof(msg->iscm_msg);
+	msg->iscm_sge.lkey   = sock->is_mem.ism_mr->lkey;
+
+	return 0;
+}
+
+static void
+ctl_msg_fini(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
+{
+	struct ib_device *device = sock->is_id->device;
+
+	ib_dma_unmap_single(device, msg->iscm_sge.addr,
+			    sizeof(msg->iscm_msg), DMA_FROM_DEVICE);
 }
 
 int ib_sock_ctl_init(struct IB_SOCK *sock)
@@ -80,8 +112,12 @@ int ib_sock_ctl_init(struct IB_SOCK *sock)
 		msg = kmalloc(sizeof(*msg), GFP_KERNEL);
 		if (msg == NULL)
 			continue;
-		count ++;
 		/* pre init */
+		if (ctl_msg_init(sock, msg) != 0) {
+			kfree(msg);
+			continue;
+		}
+		count ++;
 		ib_sock_ctl_put(sock, msg);
 	}
 	/* half of mgs uses for incomming, half outgoning */
@@ -98,7 +134,7 @@ void ib_sock_ctl_fini(struct IB_SOCK *sock)
 {
 	struct ib_sock_ctl *pos, *next;
 
-	/* XXX flush active */
+	/* XXX cancel active */
 	list_for_each_entry_safe(pos, next, &sock->is_ctl_active_list, iscm_link) {
 		list_del(&pos->iscm_link);
 		list_add(&pos->iscm_link, &sock->is_ctl_idle_list);
@@ -106,6 +142,7 @@ void ib_sock_ctl_fini(struct IB_SOCK *sock)
 
 	list_for_each_entry_safe(pos, next, &sock->is_ctl_idle_list, iscm_link) {
 		list_del(&pos->iscm_link);
+		ctl_msg_fini(sock, pos);
 
 		kfree(pos);
 	}
