@@ -42,6 +42,14 @@ ib_sock_ctl_take(struct IB_SOCK *sock)
  */
 int ib_sock_ctl_post(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
 {
+	/* base on ib_mad_post_receive_mads() - that wr isn't need to live any time 
+	 * so - save memory and declare on stack.
+	 */
+	struct ib_recv_wr wr;
+	struct ib_recv_wr *bad_wr;
+
+	ret = ib_post_recv(rx->qp, &wr, &bad_wr);
+
 	return 0;
 }
  
