@@ -1,0 +1,16 @@
+Bottom: c5ba1d05b50a037c1cf5a27401d0276cca95fc3c
+Top:    c5ba1d05b50a037c1cf5a27401d0276cca95fc3c
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-21 10:12:50 +0300
+
+attach control message to IB
+
+use IB verbs api to attach control messages
+to incomming ring.
+Send ctl mgs on wire to verify recv code works
+
+
+
+---
+
+
