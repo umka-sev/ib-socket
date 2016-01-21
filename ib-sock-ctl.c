@@ -90,6 +90,10 @@ void ib_sock_ctl_fini(struct IB_SOCK *sock)
 	struct ib_sock_ctl *pos, *next;
 
 	/* XXX flush active */
+	list_for_each_entry_safe(pos, next, &sock->is_ctl_active_list, iscm_link) {
+		list_del(&pos->iscm_link);
+		list_add(&pos->iscm_link, &sock->is_ctl_idle_list);
+	}
 
 	list_for_each_entry_safe(pos, next, &sock->is_ctl_idle_list, iscm_link) {
 		list_del(&pos->iscm_link);
