@@ -16,8 +16,11 @@
 #define IB_MAX_PARALLEL	 1
 
 /* 1 RX + 1 TX in flight */
-#define IB_MAX_CTL_MSG	(IB_MAX_PARALLEL * 2)
-#define IB_CQ_EVENTS_MAX (IB_MAX_PARALLEL * 2)
+#define IB_MAX_CTL_MSG		(IB_MAX_PARALLEL * 2)
+#define IB_CQ_EVENTS_MAX	(IB_MAX_PARALLEL * 2)
+/* abstract number, just related to CPU time spent in one event process loop
+ */
+#define IB_CQ_EVENTS_BATCH	(5)
 
 enum ib_sock_flags {
 	SOCK_CONNECTED	= 1 << 0,
@@ -47,7 +50,15 @@ struct IB_SOCK {
 
 	struct ib_sock_mem	is_mem;
 
-	/* transfer related parts */
+	/******* transfer related parts ***************/
+	/* number CQ events in batch poll */
+	struct ib_wc		is_cq_wc[IB_CQ_EVENTS_BATCH];
+	/* we can't process an cq events in callback as 
+	 * it may executed in interrupt context, so create 
+	 * work queue for it. Latter it should be per 
+	 * IB device data */
+	struct work_struct	is_cq_work;
+	
 	/* completion events */
 	struct ib_cq		*is_cq;
 	/* queue pair to communicate between nodes */
@@ -56,11 +67,13 @@ struct IB_SOCK {
 	struct ib_qp		*is_qp;
 
 	/* control messages */
-	/* IDLE <> active protection  */
+	/* IDLE <> active <> rd protection  */
 	spinlock_t		is_ctl_lock;
 	struct list_head	is_ctl_idle_list;
 	struct list_head	is_ctl_active_list;
+	struct list_head	is_ctl_rd_list;
 	wait_queue_head_t	is_ctl_waitq;
+	/******* transfer related parts end ************/
 
 	/* pre-accepted sockets */
 	spinlock_t		is_child_lock;
@@ -84,18 +97,21 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
 #define IB_HELLO_MAGIC 0x9012
 
 struct ib_hello {
-	__u32	magic;
+	uint32_t	magic;
 } WIRE_ATTR;
 
 #define IB_CTL_MSG_MAGIC	0x87154
 
 struct ib_sock_wire_msg {
 	uint32_t	sww_magic;
+	uint32_t	sww_size;
 } WIRE_ATTR;
 
 /**************************** messages on wire ********************/
 
 /************* ib sock control protocol ***************************/
+
+#define CTL_MSG_RX	0x1
 
 struct ib_sock_ctl {
 	struct list_head	iscm_link;
@@ -105,16 +121,21 @@ struct ib_sock_ctl {
 	 * later */
 	struct ib_sge		iscm_sge;
 
+	unsigned long		iscm_flags;
+
 	/* used to describe an incomming rdma transfer,
 	 * must be first WR in sending chain */
 	struct ib_sock_wire_msg	iscm_msg;
 };
 /* ctl-msg.c */
 /* init queue and post sort of rx buffer to wait incomming data */
-int ib_sock_ctl_msg_init(struct IB_SOCK *sock);
-void ib_sock_ctl_msg_fini(struct IB_SOCK *sock);
+int ib_sock_ctl_init(struct IB_SOCK *sock);
+void ib_sock_ctl_fini(struct IB_SOCK *sock);
 /* take control message to send an outgoning buffer */
-struct ib_sock_ctl *ib_sock_ctl_idle_take(struct IB_SOCK *sock);
+struct ib_sock_ctl *ib_sock_ctl_take(struct IB_SOCK *sock);
+void ib_sock_ctl_put(struct IB_SOCK *sock, struct ib_sock_ctl *msg);
+int ib_sock_ctl_post(struct IB_SOCK *sock, struct ib_sock_ctl *msg);
+
 
 /* mem.c */
 /* init function responsible to fill an number WR / SGE per socket*/

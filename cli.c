@@ -36,8 +36,16 @@ cli_init(void)
 		printk("error connect \n");
 		goto exit;
 	}
-	event = ib_socket_poll(sock);
-	printk("Event hit %lx\n", event);
+	while ( 1 ) {
+		event = ib_socket_poll(sock);
+		printk("Event hit %lx\n", event);
+		if (event & POLLERR)
+			break;
+		if (event & POLLOUT) {
+			err = ib_socket_write(sock, srv_addr, strlen(srv_addr));
+			printk("sends status %d\n", err);
+		}
+	}
 
 	ib_socket_disconnect(sock);
 exit:
