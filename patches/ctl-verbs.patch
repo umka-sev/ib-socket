@@ -1,5 +1,5 @@
 Bottom: 81e2fda531d9b691d4d1f5927e5d89a4c57de8b6
-Top:    36145a4ced59be217f2a3b7bebbbd8ee76f523bb
+Top:    3cd650b75c3827c4cb50b12db57205f72d1345dd
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-21 10:12:50 +0300
 
@@ -14,10 +14,10 @@ Send ctl mgs on wire to verify recv code works
 ---
 
 diff --git a/ib-sock-ctl.c b/ib-sock-ctl.c
-index 4f35dcd..16b76ce 100644
+index 4f35dcd..f334383 100644
 --- a/ib-sock-ctl.c
 +++ b/ib-sock-ctl.c
-@@ -42,6 +42,14 @@ ib_sock_ctl_take(struct IB_SOCK *sock)
+@@ -42,6 +42,15 @@ ib_sock_ctl_take(struct IB_SOCK *sock)
   */
  int ib_sock_ctl_post(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
  {
@@ -26,8 +26,9 @@ index 4f35dcd..16b76ce 100644
 +	 */
 +	struct ib_recv_wr wr;
 +	struct ib_recv_wr *bad_wr;
++	int ret;
 +
-+	ret = ib_post_recv(rx->qp, &wr, &bad_wr);
++	ret = ib_post_recv(sock->is_qp, &wr, &bad_wr);
 +
  	return 0;
  }
