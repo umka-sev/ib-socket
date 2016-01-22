@@ -1,0 +1,277 @@
+Bottom: 6ba620c1e5b6053cf9674940d783110d9f2451bc
+Top:    0087f939e1c2ac2e45336b5b30e6a84ccf09e136
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-01-22 21:33:58 +0300
+
+Refresh of ctl-verbs.patch
+
+---
+
+diff --git a/ib-sock-ctl.c b/ib-sock-ctl.c
+index 1811e59..6fa71de 100644
+--- a/ib-sock-ctl.c
++++ b/ib-sock-ctl.c
+@@ -47,16 +47,15 @@ int ib_sock_ctl_post(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
+ 	 */
+ 	struct ib_recv_wr wr;
+ 	struct ib_recv_wr *bad_wr;
+-	int ret;
++
++	msg->iscm_flags |= CTL_MSG_RX;
+ 
+ 	wr.next = NULL;
+-//	wr.wr_id = id | SDP_OP_RECV;
++	wr.wr_id = (uintptr_t)msg;
+ 	wr.sg_list = &msg->iscm_sge;
+ 	wr.num_sge = 1;
+ 
+-	ret = ib_post_recv(sock->is_qp, &wr, &bad_wr);
+-
+-	return ret;
++	return ib_post_recv(sock->is_qp, &wr, &bad_wr);
+ }
+  
+ void ib_sock_ctl_put(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
+@@ -79,6 +78,7 @@ ctl_msg_init(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
+ 	if (ib_dma_mapping_error(device, dma_addr))
+ 		return -EIO;
+ 
++	msg->iscm_flags = 0;
+ 	msg->iscm_sge.addr = dma_addr;
+ 	msg->iscm_sge.length = sizeof(msg->iscm_msg);
+ 	msg->iscm_sge.lkey   = sock->is_mem.ism_mr->lkey;
+@@ -100,6 +100,7 @@ int ib_sock_ctl_init(struct IB_SOCK *sock)
+ 	struct ib_sock_ctl *msg;
+ 	unsigned int i;
+ 	unsigned count = 0;
++	int ret;
+ 
+ 	init_waitqueue_head(&sock->is_ctl_waitq);
+ 	INIT_LIST_HEAD(&sock->is_ctl_active_list);
+@@ -124,7 +125,11 @@ int ib_sock_ctl_init(struct IB_SOCK *sock)
+ 	count /= 2;
+ 	for(i = 0; i < count; i++) { 
+ 		msg = ib_sock_ctl_take(sock);
+-		ib_sock_ctl_post(sock, msg);
++		ret = ib_sock_ctl_post(sock, msg);
++		if (ret != 0) {
++			msg->iscm_flags  = 0;
++			ib_sock_ctl_put(sock, msg);
++		}
+ 	}
+ 
+ 	return 0;
+@@ -134,16 +139,17 @@ void ib_sock_ctl_fini(struct IB_SOCK *sock)
+ {
+ 	struct ib_sock_ctl *pos, *next;
+ 
+-	/* XXX cancel active */
++	/* if QP destroyed it is safe to unmap memory and free */
+ 	list_for_each_entry_safe(pos, next, &sock->is_ctl_active_list, iscm_link) {
+ 		list_del(&pos->iscm_link);
++		/* active transfer should be aborted before */
+ 		list_add(&pos->iscm_link, &sock->is_ctl_idle_list);
+ 	}
+ 
+ 	list_for_each_entry_safe(pos, next, &sock->is_ctl_idle_list, iscm_link) {
+ 		list_del(&pos->iscm_link);
+-		ctl_msg_fini(sock, pos);
+ 
++		ctl_msg_fini(sock, pos);
+ 		kfree(pos);
+ 	}
+ }
+diff --git a/ib-sock-int.h b/ib-sock-int.h
+index f1818d8..25bafe2 100644
+--- a/ib-sock-int.h
++++ b/ib-sock-int.h
+@@ -16,8 +16,11 @@
+ #define IB_MAX_PARALLEL	 1
+ 
+ /* 1 RX + 1 TX in flight */
+-#define IB_MAX_CTL_MSG	(IB_MAX_PARALLEL * 2)
+-#define IB_CQ_EVENTS_MAX (IB_MAX_PARALLEL * 2)
++#define IB_MAX_CTL_MSG		(IB_MAX_PARALLEL * 2)
++#define IB_CQ_EVENTS_MAX	(IB_MAX_PARALLEL * 2)
++/* abstract number, just related to CPU time spent in one event process loop
++ */
++#define IB_CQ_EVENTS_BATCH	(5)
+ 
+ enum ib_sock_flags {
+ 	SOCK_CONNECTED	= 1 << 0,
+@@ -47,7 +50,15 @@ struct IB_SOCK {
+ 
+ 	struct ib_sock_mem	is_mem;
+ 
+-	/* transfer related parts */
++	/******* transfer related parts ***************/
++	/* number CQ events in batch poll */
++	struct ib_wc		is_cq_wc[IB_CQ_EVENTS_BATCH];
++	/* we can't process an cq events in callback as 
++	 * it may executed in interrupt context, so create 
++	 * work queue for it. Latter it should be per 
++	 * IB device data */
++	struct work_struct	is_cq_work;
++	
+ 	/* completion events */
+ 	struct ib_cq		*is_cq;
+ 	/* queue pair to communicate between nodes */
+@@ -61,6 +72,7 @@ struct IB_SOCK {
+ 	struct list_head	is_ctl_idle_list;
+ 	struct list_head	is_ctl_active_list;
+ 	wait_queue_head_t	is_ctl_waitq;
++	/******* transfer related parts end ************/
+ 
+ 	/* pre-accepted sockets */
+ 	spinlock_t		is_child_lock;
+@@ -97,6 +109,8 @@ struct ib_sock_wire_msg {
+ 
+ /************* ib sock control protocol ***************************/
+ 
++#define CTL_MSG_RX	0x1
++
+ struct ib_sock_ctl {
+ 	struct list_head	iscm_link;
+ 
+@@ -105,16 +119,20 @@ struct ib_sock_ctl {
+ 	 * later */
+ 	struct ib_sge		iscm_sge;
+ 
++	unsigned long		iscm_flags;
++
+ 	/* used to describe an incomming rdma transfer,
+ 	 * must be first WR in sending chain */
+ 	struct ib_sock_wire_msg	iscm_msg;
+ };
+ /* ctl-msg.c */
+ /* init queue and post sort of rx buffer to wait incomming data */
+-int ib_sock_ctl_msg_init(struct IB_SOCK *sock);
+-void ib_sock_ctl_msg_fini(struct IB_SOCK *sock);
++int ib_sock_ctl_init(struct IB_SOCK *sock);
++void ib_sock_ctl_fini(struct IB_SOCK *sock);
+ /* take control message to send an outgoning buffer */
+ struct ib_sock_ctl *ib_sock_ctl_idle_take(struct IB_SOCK *sock);
++int ib_sock_ctl_post(struct IB_SOCK *sock, struct ib_sock_ctl *msg);
++
+ 
+ /* mem.c */
+ /* init function responsible to fill an number WR / SGE per socket*/
+diff --git a/ib-sock.c b/ib-sock.c
+index d6bdca1..93d0cbd 100644
+--- a/ib-sock.c
++++ b/ib-sock.c
+@@ -13,6 +13,66 @@ static void ib_cq_event_callback(struct ib_event *cause, void *context)
+ 	printk("got cq event %d \n", cause->event);
+ }
+ 
++static void ib_sock_handle_rx(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
++{
++	struct ib_device *device = sock->is_id->device;
++	int ret;
++
++	ib_dma_sync_single_for_cpu(device, 
++				   msg->iscm_sge.addr, msg->iscm_sge.length,
++				   DMA_FROM_DEVICE);
++
++	if (msg->iscm_msg.sww_magic == IB_CTL_MSG_MAGIC)
++		printk("recv maic ok!\n");
++	else
++		printk("recv magic bad %x\n", msg->iscm_msg.sww_magic);
++
++
++	/* repost to processing */
++	ib_dma_sync_single_for_device(device, 
++				   msg->iscm_sge.addr, msg->iscm_sge.length,
++				   DMA_FROM_DEVICE);
++
++	ret  = ib_sock_ctl_post(sock, msg);
++	if (ret != 0)
++		printk("Error with summit to rx queue\n");
++}
++
++static void ib_sock_handle_tx(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
++{
++	/* TX event hit when TX done or error hit */
++}
++
++/* based on ip over ib code  */
++static void ib_sock_cq_work(struct work_struct *work)
++{
++	struct IB_SOCK *sock;
++	int n, i;
++	struct ib_sock_ctl *msg;
++
++	sock = container_of(work, struct IB_SOCK, is_cq_work);
++
++poll_more:
++	n = ib_poll_cq(sock->is_cq, IB_CQ_EVENTS_BATCH, sock->is_cq_wc);
++	for (i = 0; i < n; i++) {
++		msg = (struct ib_sock_ctl *)sock->is_cq_wc[i].wr_id;
++
++		if (msg->iscm_flags & CTL_MSG_RX)
++			ib_sock_handle_rx(sock, msg);
++		else
++			ib_sock_handle_tx(sock, msg);
++
++	}
++
++	/* abstract limit */
++	if (n < (IB_CQ_EVENTS_BATCH / 2)) {
++		if (unlikely(ib_req_notify_cq(sock->is_cq,
++					      IB_CQ_NEXT_COMP |
++					      IB_CQ_REPORT_MISSED_EVENTS)))
++			goto poll_more;
++	}
++
++}
+ 
+ /* have some change states  */
+ /* DID we really needs it ? */
+@@ -21,6 +81,7 @@ static void ib_cq_callback(struct ib_cq *cq, void *cq_context)
+ 	struct IB_SOCK *sock = cq_context;
+ 
+ 	printk("cq event %p\n", sock);
++	schedule_work(&sock->is_cq_work);
+ }
+ 
+ /* creation of CQ/QP isn't needs to create on route event,
+@@ -31,7 +92,10 @@ static int ib_sock_cq_qp_create(struct IB_SOCK *sock)
+ 	struct ib_qp_init_attr	init_attr;
+ 	int    ret;
+ 
+-	/* event queue */
++	/* XXX need special refactoring to extract per device data */
++	INIT_WORK(&sock->is_cq_work, ib_sock_cq_work);
++
++	/* event queue, may per CPU and per device, not per socket */
+ 	sock->is_cq = ib_create_cq(cmid->device,
+ 				   ib_cq_callback,
+ 				   ib_cq_event_callback,
+@@ -77,6 +141,8 @@ static void ib_sock_cq_qp_destroy(struct IB_SOCK *sock)
+ {
+ 	struct rdma_cm_id *cmid = sock->is_id;
+ 
++	flush_scheduled_work();
++
+ 	/* XXX is it needs ? */
+ 	if (cmid != NULL && cmid->qp != NULL)
+ 		rdma_destroy_qp(cmid);
+@@ -101,6 +167,10 @@ static int ib_sock_resource_alloc(struct IB_SOCK *sock)
+ 	if (ret < 0)
+ 		return ret;
+ 
++	ret = ib_sock_ctl_init(sock);
++	if (ret < 0)
++		return ret;
++
+ 	return 0;
+ }
+ 
+@@ -108,6 +178,7 @@ static void ib_sock_resource_free(struct IB_SOCK *sock)
+ {
+ 	ib_sock_cq_qp_destroy(sock);
+ 	ib_sock_mem_fini(sock);
++	ib_sock_ctl_fini(sock);
+ }
+ 
+ static int
