@@ -30,19 +30,24 @@ static void ib_sock_handle_rx(struct IB_SOCK *sock, struct ib_wc *wc)
 	}
 
 
-	if (msg->iscm_msg.sww_magic == IB_CTL_MSG_MAGIC)
-		printk("recv maic ok!\n");
-	else
+	if (msg->iscm_msg.sww_magic != IB_CTL_MSG_MAGIC) {
 		printk("recv magic bad %x\n", msg->iscm_msg.sww_magic);
+		goto repost;
+	}
 
+	/* do processing there */
+	printk("recv maic ok!\n");
+	spin_lock(&sock->is_ctl_lock);
+	list_move(&msg->iscm_link, &sock->is_ctl_rd_list);
+	spin_lock(&sock->is_ctl_lock);
+
+	/* ready for userland */
+	sock_event_set(sock, POLLIN);
 repost:
-	/* trasnfer ownership to the device */
-	ib_dma_sync_single_for_device(device, 
-				   msg->iscm_sge.addr, msg->iscm_sge.length,
-				   DMA_FROM_DEVICE);
 	/* repost to processing */
 	ret  = ib_sock_ctl_post(sock, msg);
-	if (ret != 0)
+	if (ret != 0) 
+		/* probably we need a chanse to report it later ? */
 		printk("Error with summit to rx queue\n");
 }
 
@@ -576,3 +581,67 @@ struct IB_SOCK *ib_socket_accept(struct IB_SOCK *parent)
 	printk("Accept returned %p\n", sock);
 	return sock;
 }
+/*****************************************************************************************/
+/* return a size of transfer */
+size_t ib_socket_read_size(struct IB_SOCK *sock)
+{
+	struct ib_sock_ctl *msg;
+	int ret = -EAGAIN;
+
+	/* as we have a single parallel transfer - 
+	 * just enough to check a first element in list */
+	spin_lock(&sock->is_ctl_lock);
+	msg = list_first_entry_or_null(&sock->is_ctl_rd_list,
+				       struct ib_sock_ctl, iscm_link);
+	if (msg != NULL)
+		ret = msg->iscm_msg.sww_size;
+	spin_unlock(&sock->is_ctl_lock);
+
+	return ret;
+}
+
+/* process contol msg and repost */
+int ib_socket_read(struct IB_SOCK *sock, void *buf, size_t size)
+{
+	struct ib_sock_ctl *msg;
+
+	/* as we have a single parallel transfer - 
+	 * just enough to check a first element in list */
+	spin_lock(&sock->is_ctl_lock);
+	msg = list_first_entry_or_null(&sock->is_ctl_rd_list,
+				       struct ib_sock_ctl, iscm_link);
+	if (msg != NULL)
+		list_del(&msg->iscm_link);
+	spin_unlock(&sock->is_ctl_lock);
+	if (msg == NULL)
+		return -EAGAIN;
+
+	return ib_sock_ctl_post(sock, msg);
+}
+
+/* send some amount data over wire */
+int ib_socket_write(struct IB_SOCK *sock, void *buf, size_t size)
+{
+	/* stub. send an CTL msg only */
+	struct ib_sock_ctl *msg;
+	struct ib_send_wr wr = {
+		.opcode = IB_WR_SEND,
+	};
+	struct ib_send_wr *bad;
+	int ret = -EINVAL;
+
+	msg = ib_sock_ctl_take(sock);
+
+	wr.next = NULL;
+	wr.wr_id = (uintptr_t)msg;
+	wr.sg_list = &msg->iscm_sge;
+	wr.num_sge = 1;
+
+	ret = ib_post_send(sock->is_qp, &wr, &bad);
+	/* if OK - will returned in idle list in the callback */
+	if (ret != 0)
+		ib_sock_ctl_put(sock, msg);
+
+	return ret;
+}
+

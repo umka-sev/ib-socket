@@ -67,10 +67,11 @@ struct IB_SOCK {
 	struct ib_qp		*is_qp;
 
 	/* control messages */
-	/* IDLE <> active protection  */
+	/* IDLE <> active <> rd protection  */
 	spinlock_t		is_ctl_lock;
 	struct list_head	is_ctl_idle_list;
 	struct list_head	is_ctl_active_list;
+	struct list_head	is_ctl_rd_list;
 	wait_queue_head_t	is_ctl_waitq;
 	/******* transfer related parts end ************/
 
@@ -96,13 +97,14 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
 #define IB_HELLO_MAGIC 0x9012
 
 struct ib_hello {
-	__u32	magic;
+	uint32_t	magic;
 } WIRE_ATTR;
 
 #define IB_CTL_MSG_MAGIC	0x87154
 
 struct ib_sock_wire_msg {
 	uint32_t	sww_magic;
+	uint32_t	sww_size;
 } WIRE_ATTR;
 
 /**************************** messages on wire ********************/
@@ -130,7 +132,8 @@ struct ib_sock_ctl {
 int ib_sock_ctl_init(struct IB_SOCK *sock);
 void ib_sock_ctl_fini(struct IB_SOCK *sock);
 /* take control message to send an outgoning buffer */
-struct ib_sock_ctl *ib_sock_ctl_idle_take(struct IB_SOCK *sock);
+struct ib_sock_ctl *ib_sock_ctl_take(struct IB_SOCK *sock);
+void ib_sock_ctl_put(struct IB_SOCK *sock, struct ib_sock_ctl *msg);
 int ib_sock_ctl_post(struct IB_SOCK *sock, struct ib_sock_ctl *msg);
 
 

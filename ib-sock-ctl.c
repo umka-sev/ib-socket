@@ -47,6 +47,12 @@ int ib_sock_ctl_post(struct IB_SOCK *sock, struct ib_sock_ctl *msg)
 	 */
 	struct ib_recv_wr wr;
 	struct ib_recv_wr *bad_wr;
+	struct ib_device *device = sock->is_id->device;
+
+	/* trasnfer ownership to the device */
+	ib_dma_sync_single_for_device(device, 
+				   msg->iscm_sge.addr, msg->iscm_sge.length,
+				   DMA_FROM_DEVICE);
 
 	msg->iscm_flags |= CTL_MSG_RX;
 
@@ -105,6 +111,7 @@ int ib_sock_ctl_init(struct IB_SOCK *sock)
 	init_waitqueue_head(&sock->is_ctl_waitq);
 	INIT_LIST_HEAD(&sock->is_ctl_active_list);
 	INIT_LIST_HEAD(&sock->is_ctl_idle_list);
+	INIT_LIST_HEAD(&sock->is_ctl_rd_list);
 
 	/* preallocate until limit.
 	 * we can allocate it by request, but simplify a code
