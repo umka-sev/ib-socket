@@ -46,7 +46,7 @@ srv_init(void)
 		}
 		if (read_st && (event & POLLIN)) {
 			/* read done */
-			printf("%s\n", data);
+			printk("%s\n", data);
 			kfree(data);
 			read_st = false;
 		}
