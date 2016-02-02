@@ -1,5 +1,5 @@
 Bottom: ae021e49d42717db8ff626a6c73e32165a632afb
-Top:    c9a0a7d1b2e91d8413d4f8ff6d5264e7412b54f5
+Top:    f870c533aa1a3cf17d3d992cfc9d8c41d47004b1
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-20 09:06:46 +0300
 
@@ -37,10 +37,26 @@ index ed4582e..247fd40 100644
 +}
 \ No newline at end of file
 diff --git a/ib-sock-int.h b/ib-sock-int.h
-index 4eda29d..f6faa11 100644
+index 4eda29d..082c7db 100644
 --- a/ib-sock-int.h
 +++ b/ib-sock-int.h
-@@ -91,6 +91,30 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
+@@ -73,8 +73,15 @@ struct IB_SOCK {
+ 	struct list_head	is_ctl_active_list;
+ 	struct list_head	is_ctl_rd_list;
+ 	wait_queue_head_t	is_ctl_waitq;
++
++	/* IDLE WR */
++	struct list_head	is_wr_idle_list;
++	/* some active TX needs to abort in flight */
++	struct list_head	is_wr_active_list;
++	wait_queue_head_t	is_wr_waitq;
+ 	/******* transfer related parts end ************/
+ 
++
+ 	/* pre-accepted sockets */
+ 	spinlock_t		is_child_lock;
+ 	struct list_head	is_child;
+@@ -91,6 +98,30 @@ void sock_event_set(struct IB_SOCK *sock, unsigned int event)
  	wake_up(&sock->is_events_wait);
  }
  
@@ -71,7 +87,7 @@ index 4eda29d..f6faa11 100644
  /**************************** messages on wire ********************/
  #define WIRE_ATTR	__attribute__((packed))
  
-@@ -127,6 +151,15 @@ struct ib_sock_ctl {
+@@ -127,6 +158,15 @@ struct ib_sock_ctl {
  	 * must be first WR in sending chain */
  	struct ib_sock_wire_msg	iscm_msg;
  };
@@ -89,7 +105,7 @@ index 4eda29d..f6faa11 100644
  int ib_sock_ctl_init(struct IB_SOCK *sock);
 diff --git a/ib-sock-wr.c b/ib-sock-wr.c
 new file mode 100644
-index 0000000..115588e
+index 0000000..1eec8ef
 --- /dev/null
 +++ b/ib-sock-wr.c
 @@ -0,0 +1,125 @@
@@ -183,7 +199,7 @@ index 0000000..115588e
 +int wr_init(struct IB_SOCK *sock)
 +{
 +	struct ib_sock_wr *wr;
-+	size_t num_wr = sock->is_parallel * 2;
++	size_t num_wr = IB_MAX_PARALLEL * 2;
 +	int i;
 +
 +	INIT_LIST_HEAD(&sock->is_wr_idle_list);
