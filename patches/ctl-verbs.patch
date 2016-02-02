@@ -1,5 +1,5 @@
-Bottom: fd856c0ce4f708032ba5a33272d759bbd390e2bd
-Top:    2bea3b810f0516eef0624fe1983f9db0b7e34176
+Bottom: e2d45d07a36bfb4ff0988a8fddff1fd84009996e
+Top:    4d9b3321af75b907602542b4d4ceceb3094017dc
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-21 10:12:50 +0300
 
@@ -259,7 +259,7 @@ index f1818d8..4eda29d 100644
  /* mem.c */
  /* init function responsible to fill an number WR / SGE per socket*/
 diff --git a/ib-sock.c b/ib-sock.c
-index d6bdca1..64ce7c7 100644
+index c29b400..b228605 100644
 --- a/ib-sock.c
 +++ b/ib-sock.c
 @@ -13,6 +13,83 @@ static void ib_cq_event_callback(struct ib_event *cause, void *context)
@@ -366,7 +366,7 @@ index d6bdca1..64ce7c7 100644
  	sock->is_cq = ib_create_cq(cmid->device,
  				   ib_cq_callback,
  				   ib_cq_event_callback,
-@@ -77,6 +158,8 @@ static void ib_sock_cq_qp_destroy(struct IB_SOCK *sock)
+@@ -80,6 +161,8 @@ static void ib_sock_cq_qp_destroy(struct IB_SOCK *sock)
  {
  	struct rdma_cm_id *cmid = sock->is_id;
  
@@ -375,7 +375,7 @@ index d6bdca1..64ce7c7 100644
  	/* XXX is it needs ? */
  	if (cmid != NULL && cmid->qp != NULL)
  		rdma_destroy_qp(cmid);
-@@ -101,6 +184,10 @@ static int ib_sock_resource_alloc(struct IB_SOCK *sock)
+@@ -104,6 +187,10 @@ static int ib_sock_resource_alloc(struct IB_SOCK *sock)
  	if (ret < 0)
  		return ret;
  
@@ -386,7 +386,7 @@ index d6bdca1..64ce7c7 100644
  	return 0;
  }
  
-@@ -108,6 +195,7 @@ static void ib_sock_resource_free(struct IB_SOCK *sock)
+@@ -111,6 +198,7 @@ static void ib_sock_resource_free(struct IB_SOCK *sock)
  {
  	ib_sock_cq_qp_destroy(sock);
  	ib_sock_mem_fini(sock);
@@ -394,7 +394,7 @@ index d6bdca1..64ce7c7 100644
  }
  
  static int
-@@ -493,3 +581,67 @@ struct IB_SOCK *ib_socket_accept(struct IB_SOCK *parent)
+@@ -496,3 +584,67 @@ struct IB_SOCK *ib_socket_accept(struct IB_SOCK *parent)
  	printk("Accept returned %p\n", sock);
  	return sock;
  }
