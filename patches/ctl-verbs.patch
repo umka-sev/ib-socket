@@ -1,5 +1,5 @@
 Bottom: fd856c0ce4f708032ba5a33272d759bbd390e2bd
-Top:    ae6374f4f52b047b3f17707bae498916bba862d7
+Top:    a0c673156cb90c6eb58a8b7bee0cc85c00411a74
 Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
 Date:   2016-01-21 10:12:50 +0300
 
@@ -484,14 +484,14 @@ index c74c3df..f6f6c51 100644
  #endif
 \ No newline at end of file
 diff --git a/srv.c b/srv.c
-index 6f350e9..d932969 100644
+index 6f350e9..ecb8ad8 100644
 --- a/srv.c
 +++ b/srv.c
 @@ -7,6 +7,8 @@ srv_init(void)
  {
  	struct IB_SOCK *sock, *sock_child = NULL;
  	unsigned long event = 0;
-+	bool read_st;
++	bool read_st = false;
 +	void *data;
  	int ret;
  
