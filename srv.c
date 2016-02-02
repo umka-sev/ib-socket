@@ -7,7 +7,7 @@ srv_init(void)
 {
 	struct IB_SOCK *sock, *sock_child = NULL;
 	unsigned long event = 0;
-	bool read_st;
+	bool read_st = false;
 	void *data;
 	int ret;
 
