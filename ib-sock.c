@@ -45,6 +45,7 @@ static int ib_sock_cq_qp_create(struct IB_SOCK *sock)
 		printk("error create cq %d\n", ret);
 		return ret;
 	}
+	printk("alloc CQ %p\n", sock->is_cq);
 
 	/* XXX need check a ret code ? */
 	ib_req_notify_cq(sock->is_cq, IB_CQ_NEXT_COMP);
@@ -69,6 +70,8 @@ static int ib_sock_cq_qp_create(struct IB_SOCK *sock)
 		printk("error create qp %d\n", ret);
 		return ret;
 	}
+	sock->is_qp = cmid->qp;
+	printk("alloc QP %p\n", sock->is_qp);
 
 	return 0;
 }
