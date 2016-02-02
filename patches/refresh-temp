@@ -1,0 +1,30 @@
+Bottom: 20217f47dc32b54ca1aa7c130e025e9bb07a0ff3
+Top:    b559fd41a38b7cd16d92736ffde85acc61fcf62a
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-02-02 17:23:23 +0300
+
+Refresh of sock-res-completion.patch
+
+---
+
+diff --git a/ib-sock.c b/ib-sock.c
+index d6bdca1..c29b400 100644
+--- a/ib-sock.c
++++ b/ib-sock.c
+@@ -45,6 +45,7 @@ static int ib_sock_cq_qp_create(struct IB_SOCK *sock)
+ 		printk("error create cq %d\n", ret);
+ 		return ret;
+ 	}
++	printk("alloc CQ %p\n", sock->is_cq);
+ 
+ 	/* XXX need check a ret code ? */
+ 	ib_req_notify_cq(sock->is_cq, IB_CQ_NEXT_COMP);
+@@ -69,6 +70,8 @@ static int ib_sock_cq_qp_create(struct IB_SOCK *sock)
+ 		printk("error create qp %d\n", ret);
+ 		return ret;
+ 	}
++	sock->is_qp = cmid->qp;
++	printk("alloc QP %p\n", sock->is_qp);
+ 
+ 	return 0;
+ }
