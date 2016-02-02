@@ -1,0 +1,42 @@
+Bottom: c9a0a7d1b2e91d8413d4f8ff6d5264e7412b54f5
+Top:    f870c533aa1a3cf17d3d992cfc9d8c41d47004b1
+Author: Alexey Lyashkov <shadow@Alexeys-MacBook-Pro.local>
+Date:   2016-02-02 14:48:11 +0300
+
+Refresh of wr-base.patch
+
+---
+
+diff --git a/ib-sock-int.h b/ib-sock-int.h
+index f6faa11..082c7db 100644
+--- a/ib-sock-int.h
++++ b/ib-sock-int.h
+@@ -73,8 +73,15 @@ struct IB_SOCK {
+ 	struct list_head	is_ctl_active_list;
+ 	struct list_head	is_ctl_rd_list;
+ 	wait_queue_head_t	is_ctl_waitq;
++
++	/* IDLE WR */
++	struct list_head	is_wr_idle_list;
++	/* some active TX needs to abort in flight */
++	struct list_head	is_wr_active_list;
++	wait_queue_head_t	is_wr_waitq;
+ 	/******* transfer related parts end ************/
+ 
++
+ 	/* pre-accepted sockets */
+ 	spinlock_t		is_child_lock;
+ 	struct list_head	is_child;
+diff --git a/ib-sock-wr.c b/ib-sock-wr.c
+index 115588e..1eec8ef 100644
+--- a/ib-sock-wr.c
++++ b/ib-sock-wr.c
+@@ -88,7 +88,7 @@ out_err:
+ int wr_init(struct IB_SOCK *sock)
+ {
+ 	struct ib_sock_wr *wr;
+-	size_t num_wr = sock->is_parallel * 2;
++	size_t num_wr = IB_MAX_PARALLEL * 2;
+ 	int i;
+ 
+ 	INIT_LIST_HEAD(&sock->is_wr_idle_list);
