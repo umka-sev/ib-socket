@@ -88,7 +88,7 @@ out_err:
 int wr_init(struct IB_SOCK *sock)
 {
 	struct ib_sock_wr *wr;
-	size_t num_wr = sock->is_parallel * 2;
+	size_t num_wr = IB_MAX_PARALLEL * 2;
 	int i;
 
 	INIT_LIST_HEAD(&sock->is_wr_idle_list);

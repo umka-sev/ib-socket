@@ -73,7 +73,14 @@ struct IB_SOCK {
 	struct list_head	is_ctl_active_list;
 	struct list_head	is_ctl_rd_list;
 	wait_queue_head_t	is_ctl_waitq;
+
+	/* IDLE WR */
+	struct list_head	is_wr_idle_list;
+	/* some active TX needs to abort in flight */
+	struct list_head	is_wr_active_list;
+	wait_queue_head_t	is_wr_waitq;
 	/******* transfer related parts end ************/
+
 
 	/* pre-accepted sockets */
 	spinlock_t		is_child_lock;
